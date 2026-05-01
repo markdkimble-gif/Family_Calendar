@@ -731,7 +731,8 @@ async function loadMeals() {
     meals = {};
     for (const r of data) meals[r.event_key] = { id:r.id, mealId:r.meal_lib_id,
       name:r.name, icon:r.icon,
-      sides:(cached[r.event_key] && cached[r.event_key].sides) || [] };
+      sides: Array.isArray(r.sides) ? r.sides
+            : (cached[r.event_key] && cached[r.event_key].sides) || [] };
     // Preserve cached meals not present in DB (local-only saves)
     let preserved = 0;
     for (const [k, m] of Object.entries(cached)) {
@@ -762,7 +763,7 @@ async function assignMeal(key, libItem) {
   try {
     const { data, error } = await db.from('meals').insert({
       calendar_id:CALENDAR_ID, event_key:key,
-      meal_lib_id:libItem.id, name:libItem.name, icon:libItem.icon
+      meal_lib_id:libItem.id, name:libItem.name, icon:libItem.icon, sides:existingSides
     }).select().single();
     if (error) throw error;
     meals[key].id = data.id;
@@ -786,7 +787,19 @@ async function addSideToDay(key, sideItem) {
   if (!meals[key].sides) meals[key].sides = [];
   if (meals[key].sides.some(s => s.id === sideItem.id)) return; // no duplicates
   meals[key].sides.push({ id:sideItem.id, name:sideItem.name, icon:sideItem.icon });
-  incrementSideUsage(sideItem.id);
+  await incrementSideUsage(sideItem.id);
+  try {
+    if (meals[key].id) {
+      await db.from('meals').update({ sides: meals[key].sides }).eq('id', meals[key].id);
+    } else {
+      const { data, error } = await db.from('meals').insert({
+        calendar_id:CALENDAR_ID, event_key:key,
+        meal_lib_id:null, name:'', icon:'', sides:meals[key].sides
+      }).select().single();
+      if (error) throw error;
+      meals[key].id = data.id;
+    }
+  } catch(e) { console.warn('Save side failed:', e.message); }
   lsSet('fam-meals-v6', meals);
 }
 
@@ -794,9 +807,15 @@ async function removeSideFromDay(key, sideId) {
   if (!meals[key] || !meals[key].sides) return;
   const before = meals[key].sides.length;
   meals[key].sides = meals[key].sides.filter(s => s.id !== sideId);
-  if (meals[key].sides.length < before) decrementSideUsage(sideId);
-  // If a sides-only record now has nothing, drop it
-  if (!meals[key].mealId && !meals[key].sides.length) delete meals[key];
+  if (meals[key].sides.length < before) await decrementSideUsage(sideId);
+  const isEmpty = !meals[key].mealId && !meals[key].sides.length;
+  const dbId = meals[key].id;
+  if (isEmpty) {
+    if (dbId) try { await db.from('meals').delete().eq('id', dbId); } catch(e){}
+    delete meals[key];
+  } else if (dbId) {
+    try { await db.from('meals').update({ sides: meals[key].sides }).eq('id', dbId); } catch(e){}
+  }
   lsSet('fam-meals-v6', meals);
 }
 
@@ -903,10 +922,27 @@ async function decrementMealUsage(id) {
 }
 
 // ═══════════════════════════════════════════════
-// SIDES LIBRARY (localStorage-only for now)
+// SIDES LIBRARY (Supabase + localStorage cache)
 // ═══════════════════════════════════════════════
-function loadSideLib() {
-  sideLib = lsGet('fam-sidelib-v1') || defaultSideLib();
+async function loadSideLib() {
+  const cached = lsGet('fam-sidelib-v1') || [];
+  try {
+    const { data, error } = await db.from('side_library').select('*').eq('calendar_id', CALENDAR_ID).order('times_used', {ascending:false});
+    if (error) throw error;
+    sideLib = data.map(r=>({ id:r.id, name:r.name, icon:r.icon||'🥣', timesUsed:r.times_used||0, lastUsed:r.last_used }));
+    // Preserve cached items not yet in DB (run pushLocalToSupabase to migrate)
+    const dbIds = new Set(sideLib.map(s => String(s.id)));
+    let preserved = 0;
+    for (const item of cached) {
+      if (item.id && !dbIds.has(String(item.id))) { sideLib.push(item); preserved++; }
+    }
+    if (preserved) console.warn(`⚠️ ${preserved} cached side lib item(s) not in DB — preserved as local.`);
+    if (!sideLib.length) sideLib = defaultSideLib();
+    lsSet('fam-sidelib-v1', sideLib);
+  } catch(e) {
+    console.warn('Side lib load failed, using cache:', e.message);
+    sideLib = cached.length ? cached : defaultSideLib();
+  }
   cleanupDefaultSides();
 }
 
@@ -921,28 +957,42 @@ function cleanupDefaultSides() {
   }
   lsSet('fam-sidelib-cleanup-v1', true);
 }
-function addToSideLib(name, icon) {
-  const item = { id:'side-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
-    name, icon:icon||'🥣', timesUsed:0, lastUsed:null };
+
+async function addToSideLib(name, icon) {
+  const item = { name, icon:icon||'🥣', timesUsed:0, lastUsed:null };
+  try {
+    const { data, error } = await db.from('side_library').insert({
+      calendar_id:CALENDAR_ID, name, icon:icon||'🥣', times_used:0
+    }).select().single();
+    if (error) throw error;
+    item.id = data.id;
+  } catch(e) { console.warn('Add side lib failed:', e.message); }
+  if (!item.id) item.id = 'side-'+Date.now()+'-'+Math.random().toString(36).slice(2,6);
   sideLib.push(item);
   lsSet('fam-sidelib-v1', sideLib);
   return item;
 }
-function deleteSideFromLib(id) {
+
+async function deleteSideFromLib(id) {
   sideLib = sideLib.filter(s=>s.id!==id);
+  try { await db.from('side_library').delete().eq('id', id); } catch(e){}
   lsSet('fam-sidelib-v1', sideLib);
 }
-function incrementSideUsage(id) {
+
+async function incrementSideUsage(id) {
   const item = sideLib.find(s=>s.id===id);
   if (!item) return;
   item.timesUsed = (item.timesUsed||0) + 1;
   item.lastUsed = new Date().toISOString().slice(0,10);
+  try { await db.from('side_library').update({ times_used:item.timesUsed, last_used:item.lastUsed }).eq('id', id); } catch(e){}
   lsSet('fam-sidelib-v1', sideLib);
 }
-function decrementSideUsage(id) {
+
+async function decrementSideUsage(id) {
   const item = sideLib.find(s=>s.id===id);
   if (!item) return;
   item.timesUsed = Math.max(0, (item.timesUsed||0) - 1);
+  try { await db.from('side_library').update({ times_used:item.timesUsed }).eq('id', id); } catch(e){}
   lsSet('fam-sidelib-v1', sideLib);
 }
 function defaultSideLib() {
@@ -1112,13 +1162,47 @@ async function pushLocalToSupabase(){
     try{
       const{data,error}=await db.from('meals').insert({
         calendar_id:CALENDAR_ID,event_key:key,
-        meal_lib_id:dbMealId,name:m.name,icon:m.icon
+        meal_lib_id:dbMealId,name:m.name,icon:m.icon,sides:m.sides||[]
       }).select().single();
       if(error)throw error;
       m.id=data.id;
       if(dbMealId)m.mealId=dbMealId;
       mealsPushed++;
     }catch(e){console.warn(`meal "${m.name}" on ${key} failed:`,e.message);mealsFailed++;}
+  }
+
+  // 2.5) Push side library items
+  const sideIdMap = {};
+  let sideLibPushed=0, sideLibFailed=0;
+  for (const item of sideLib) {
+    if (isDbId(item.id)) continue;
+    try {
+      const { data, error } = await db.from('side_library').insert({
+        calendar_id:CALENDAR_ID, name:item.name, icon:item.icon||'🥣',
+        times_used:item.timesUsed||0, last_used:item.lastUsed
+      }).select().single();
+      if (error) throw error;
+      sideIdMap[item.id] = data.id;
+      item.id = data.id;
+      sideLibPushed++;
+    } catch(e) { console.warn(`sideLib "${item.name}" failed:`, e.message); sideLibFailed++; }
+  }
+  // 2.6) Re-save sides on meal records (translate old side ids, push to DB)
+  let sideOnMealsPushed = 0;
+  for (const [k, m] of Object.entries(meals)) {
+    if (!m.sides || !m.sides.length) continue;
+    let mutated = false;
+    for (const s of m.sides) {
+      if (sideIdMap[s.id]) { s.id = sideIdMap[s.id]; mutated = true; }
+    }
+    if (isDbId(m.id)) {
+      try {
+        await db.from('meals').update({ sides: m.sides }).eq('id', m.id);
+        sideOnMealsPushed++;
+      } catch(e) { console.warn(`sides on ${k} failed:`, e.message); }
+    } else if (mutated) {
+      // No DB id yet — will be pushed in step 2 below (ensure sides included there too)
+    }
   }
 
   // 3) Push events (the main thing the user is worried about)
@@ -1142,13 +1226,14 @@ async function pushLocalToSupabase(){
   lsSet('fam-events-v6',events);
   lsSet('fam-meals-v6',meals);
   lsSet('fam-meallib-v6',mealLib);
+  lsSet('fam-sidelib-v1',sideLib);
 
-  console.log(`✅ Pushed: ${evPushed} event(s), ${libPushed} meal lib item(s), ${mealsPushed} day meal(s).`);
-  if(evFailed||libFailed||mealsFailed){
-    console.warn(`⚠️  Failures: ${evFailed} events, ${libFailed} mealLib, ${mealsFailed} meals. See warnings above.`);
+  console.log(`✅ Pushed: ${evPushed} event(s), ${libPushed} meal lib, ${mealsPushed} day meal(s), ${sideLibPushed} side lib, ${sideOnMealsPushed} sides-on-meals updated.`);
+  if(evFailed||libFailed||mealsFailed||sideLibFailed){
+    console.warn(`⚠️  Failures: ${evFailed} events, ${libFailed} mealLib, ${mealsFailed} meals, ${sideLibFailed} sideLib. See warnings above.`);
   }
   console.log('Hard-refresh to confirm everything loads from Supabase.');
-  return{evPushed,libPushed,mealsPushed,evFailed,libFailed,mealsFailed};
+  return{evPushed,libPushed,mealsPushed,sideLibPushed,sideOnMealsPushed,evFailed,libFailed,mealsFailed,sideLibFailed};
 }
 
 // ═══════════════════════════════════════════════
@@ -1833,10 +1918,10 @@ document.getElementById('selectedSideEmoji').addEventListener('click',()=>{
   }else{row.style.display='none';}
 });
 
-document.getElementById('addSideToLib').addEventListener('click',()=>{
+document.getElementById('addSideToLib').addEventListener('click',async()=>{
   const name=document.getElementById('newSideName').value.trim();
   if(!name)return;
-  addToSideLib(name,sidePickerSelectedEmoji);
+  await addToSideLib(name,sidePickerSelectedEmoji);
   document.getElementById('newSideName').value='';
   document.getElementById('sideEmojiRow').style.display='none';
   sidePickerSelectedEmoji='🥣';
@@ -1987,7 +2072,7 @@ document.getElementById('libAddBtn').addEventListener('click',async()=>{
   const name=document.getElementById('libMealName').value.trim();
   if(!name)return;
   const s=getLibState();
-  if(currentLibType==='side')addToSideLib(name,s.getEmoji());
+  if(currentLibType==='side')await addToSideLib(name,s.getEmoji());
   else await addToMealLib(name,s.getEmoji());
   document.getElementById('libMealName').value='';
   document.getElementById('libEmojiRow')?.remove();
@@ -2262,8 +2347,7 @@ document.querySelectorAll('.view-mode-btn').forEach(btn=>{
 // BOOT
 // ═══════════════════════════════════════════════
 async function init(){
-  loadSideLib();
-  await Promise.all([loadEvents(), loadMeals(), loadMealLib()]);
+  await Promise.all([loadEvents(), loadMeals(), loadMealLib(), loadSideLib()]);
   backfillIconsFromName();
   await cleanupSeedData();
   if(Object.keys(events).length===0){
