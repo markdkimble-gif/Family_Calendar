@@ -680,7 +680,9 @@ async function loadEvents() {
     for (const [k, list] of Object.entries(cached)) {
       for (const ev of list) {
         if (ev.fromICS) continue; // ICS events are authoritative from syncICS — never restore from cache
-        if (ev.id && !dbIds.has(String(ev.id))) {
+        // Only preserve events that never made it to DB (local-style id). DB-id'd events
+        // missing from the result were deleted on another device — let them disappear.
+        if (ev.id && !isDbId(ev.id)) {
           if (!events[k]) events[k] = [];
           events[k].push(ev);
           preserved++;
@@ -765,11 +767,12 @@ async function loadMeals() {
       name:r.name, icon:r.icon,
       sides: Array.isArray(r.sides) ? r.sides
             : (cached[r.event_key] && cached[r.event_key].sides) || [] };
-    // Preserve cached meals not present in DB (local-only saves)
+    // Preserve cached meals not present in DB — only if they never made it to DB
+    // (id is missing or local). DB-id'd missing rows were deleted on another device.
     let preserved = 0;
     for (const [k, m] of Object.entries(cached)) {
       if (!meals[k] && (m.name || (m.sides && m.sides.length))) {
-        meals[k] = m; preserved++;
+        if (!m.id || !isDbId(m.id)) { meals[k] = m; preserved++; }
       }
     }
     if (preserved) console.warn(`⚠️ ${preserved} cached meal(s) not in DB — preserved as local.`);
@@ -897,11 +900,11 @@ async function loadMealLib() {
     const { data, error } = await db.from('meal_library').select('*').eq('calendar_id', CALENDAR_ID).order('times_used', {ascending:false});
     if (error) throw error;
     mealLib = data.map(r=>({ id:r.id, name:r.name, icon:r.icon||'🍽️', timesUsed:r.times_used||0, lastUsed:r.last_used }));
-    // Preserve cached library items whose id isn't in the DB (local-only adds)
-    const dbIds = new Set(mealLib.map(m => String(m.id)));
+    // Preserve cached library items only if they have a local-style id (never saved to DB).
+    // DB-id'd items missing from the result were deleted on another device.
     let preserved = 0;
     for (const item of cached) {
-      if (item.id && !dbIds.has(String(item.id))) { mealLib.push(item); preserved++; }
+      if (item.id && !isDbId(item.id)) { mealLib.push(item); preserved++; }
     }
     if (preserved) console.warn(`⚠️ ${preserved} cached meal lib item(s) not in DB — preserved as local.`);
     if (!mealLib.length) mealLib = defaultMealLib();
@@ -962,11 +965,10 @@ async function loadSideLib() {
     const { data, error } = await db.from('side_library').select('*').eq('calendar_id', CALENDAR_ID).order('times_used', {ascending:false});
     if (error) throw error;
     sideLib = data.map(r=>({ id:r.id, name:r.name, icon:r.icon||'🥣', timesUsed:r.times_used||0, lastUsed:r.last_used }));
-    // Preserve cached items not yet in DB (run pushLocalToSupabase to migrate)
-    const dbIds = new Set(sideLib.map(s => String(s.id)));
+    // Preserve cached items only if they have a local-style id (never saved to DB).
     let preserved = 0;
     for (const item of cached) {
-      if (item.id && !dbIds.has(String(item.id))) { sideLib.push(item); preserved++; }
+      if (item.id && !isDbId(item.id)) { sideLib.push(item); preserved++; }
     }
     if (preserved) console.warn(`⚠️ ${preserved} cached side lib item(s) not in DB — preserved as local.`);
     if (!sideLib.length) sideLib = defaultSideLib();
