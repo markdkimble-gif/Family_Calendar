@@ -185,6 +185,11 @@ padding:6px 10px;font-family:‘Nunito’,sans-serif;font-size:.86rem;outline:no
 .btn-add{background:var(–dad);color:#fff;border:none;border-radius:9px;padding:8px;
 font-family:‘Nunito’,sans-serif;font-weight:800;font-size:.88rem;cursor:pointer;margin-top:2px;transition:opacity .15s;}
 .btn-add:hover{opacity:.85;}
+.multi-day-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.78rem;
+font-weight:700;color:var(–text);user-select:none;}
+.multi-day-toggle input{cursor:pointer;width:14px;height:14px;margin:0;}
+.event-chip.multi-day-cont{font-style:italic;opacity:.92;border-left:3px solid currentColor;padding-left:4px;}
+.ev-multi-info{font-size:.72rem;color:var(–muted);margin-top:2px;font-weight:700;}
 
 /* ── MEAL PICKER (shown inside side panel for meal strip clicks) ── */
 .meal-picker{padding:14px 20px;display:flex;flex-direction:column;gap:10px;flex:1;overflow-y:auto;}
@@ -329,6 +334,13 @@ color:var(–muted);transition:all .15s;}
       <label>➕ Add Event</label>
       <input type="text" id="newTitle" placeholder="What's happening?">
       <input type="time" id="newTime" value="09:00">
+      <label class="multi-day-toggle">
+        <input type="checkbox" id="multiDayChk"> Multi-day event (e.g. work trip)
+      </label>
+      <div id="multiDayFields" style="display:none;">
+        <label>End date</label>
+        <input type="date" id="endDate">
+      </div>
       <select id="newPerson">
         <option value="family">🏠 Whole Family</option>
         <option value="dad">🔵 Dad</option>
@@ -672,29 +684,35 @@ document.getElementById('syncBtn').addEventListener('click',syncICS);
 async function addEv(y,m,d,ev,doSave=true){
   const key=`${y}-${m}-${d}`;
   if(!events[key])events[key]=[];
-  if(!ev.fromICS&&events[key].some(e=>e.title===ev.title&&!e.fromICS))return;
+  if(!ev.fromICS&&events[key].some(e=>e.title===ev.title&&!e.fromICS&&e.uid===(ev.uid||'')))return;
   events[key].push(ev);
   if(doSave)await saveEvent(key,ev);
 }
 
-async function seedDefaults(){
-  const y=today.getFullYear(),m=today.getMonth(),dIM=new Date(y,m+1,0).getDate();
-  addEv(y,m,10,{title:'✈️ Dad – Work Trip',person:'dad',time:'7:00 AM',icon:'✈️'},false);
-  addEv(y,m,11,{title:'✈️ Dad Away',person:'dad',time:'All Day',icon:'✈️'},false);
-  addEv(y,m,12,{title:'🛬 Dad Returns',person:'dad',time:'5:30 PM',icon:'✈️'},false);
-  addEv(y,m,7,{title:'Mom – Dentist',person:'mom',time:'11:00 AM',icon:'🦷'},false);
-  addEv(y,m,20,{title:'Mom – Book Club',person:'mom',time:'7:00 PM',icon:'📚'},false);
-  addEv(y,m,5,{title:'Alice – Art Class 🎨',person:'alice',time:'3:30 PM',icon:'🎨'},false);
-  addEv(y,m,8,{title:'Charlotte – School Project',person:'charlotte',time:'After School',icon:'📚'},false);
-  addEv(y,m,15,{title:'Family Movie Night 🎬',person:'family',time:'7:00 PM',icon:'🎬'},false);
-  addEv(y,m,22,{title:'Grandma Visit! 👵',person:'family',time:'12:00 PM',icon:'👵'},false);
-  const rows=[];
-  for(const[key,evList]of Object.entries(events))
-    for(const ev of evList)
-      rows.push({calendar_id:CALENDAR_ID,event_key:key,title:ev.title,person:ev.person,
-        time:ev.time||'',icon:ev.icon||'',location:ev.location||'',uid:ev.uid||'',from_ics:false});
-  try{if(rows.length)await db.from('events').insert(rows);}catch(e){console.warn(e);}
-  lsSet('fam-events-v6',events);
+function isoDate(y,m,d){return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
+
+function getMultiDayGroup(uid){
+  if(!uid||!uid.startsWith('multi-'))return[];
+  const result=[];
+  for(const[k,evList]of Object.entries(events)){
+    for(const ev of evList){
+      if(ev.uid===uid)result.push({key:k,ev});
+    }
+  }
+  result.sort((a,b)=>{
+    const[ay,am,ad]=a.key.split('-').map(Number);
+    const[by,bm,bd]=b.key.split('-').map(Number);
+    return new Date(ay,am,ad)-new Date(by,bm,bd);
+  });
+  return result;
+}
+
+async function cleanupSeedData(){
+  if(lsGet('fam-seed-cleanup-v3'))return;
+  events={};
+  localStorage.removeItem('fam-events-v6');
+  lsSet('fam-seed-cleanup-v3',true);
+  console.log('🧹 Cleared local event cache. Soccer will resync next.');
 }
 
 // ═══════════════════════════════════════════════
@@ -768,9 +786,19 @@ function renderCalendar(){
       const MAX=3;
       sorted.slice(0,MAX).forEach(ev=>{
         const chip=document.createElement('div');
-        chip.className=`event-chip ${ev.person}`;
+        let cls=`event-chip ${ev.person}`;
+        let tipExtra='';
+        if(ev.uid&&ev.uid.startsWith('multi-')){
+          const group=getMultiDayGroup(ev.uid);
+          if(group.length>1){
+            const idx=group.findIndex(g=>g.key===key);
+            if(idx>0)cls+=' multi-day-cont';
+            tipExtra=` · Day ${idx+1} of ${group.length}`;
+          }
+        }
+        chip.className=cls;
         chip.textContent=(ev.icon?ev.icon+' ':'')+ev.title;
-        chip.title=ev.title+(ev.time?' · '+ev.time:'');
+        chip.title=ev.title+(ev.time?' · '+ev.time:'')+tipExtra;
         cell.appendChild(chip);
       });
       if(sorted.length>MAX){
@@ -841,7 +869,13 @@ function switchPanelTab(tab){
   document.querySelectorAll('.panel-tab-content').forEach(t=>t.classList.toggle('active',t.id===`tab-${tab}`));
   const panel=document.getElementById('sidePanel');
   const y=+panel.dataset.y,m=+panel.dataset.m,d=+panel.dataset.d;
-  if(tab==='events')renderPanelBody(y,m,d);
+  if(tab==='events'){
+    renderPanelBody(y,m,d);
+    document.getElementById('endDate').value=isoDate(y,m,d);
+    document.getElementById('multiDayChk').checked=false;
+    document.getElementById('multiDayFields').style.display='none';
+    document.getElementById('newTime').style.display='';
+  }
   if(tab==='meal')renderMealPicker(y,m,d);
 }
 
@@ -870,16 +904,35 @@ function addSection(parent,label){
 function mkEvent(ev,key){
   const el=document.createElement('div');el.className=`panel-event ${ev.person}`;
   const loc=ev.location?`<div class="ev-loc">📍 ${ev.location}</div>`:'';
-  const delBtn=ev.id&&!ev.fromICS?`<button class="ev-del" onclick="deleteAndRefresh('${key}','${ev.id}')">✕</button>`:'';
+  let multiInfo='';
+  if(ev.uid&&ev.uid.startsWith('multi-')){
+    const group=getMultiDayGroup(ev.uid);
+    if(group.length>1){
+      const idx=group.findIndex(g=>g.key===key);
+      const fmt=(s)=>{const[y,m,d]=s.split('-').map(Number);
+        return new Date(y,m,d).toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+      multiInfo=`<div class="ev-multi-info">📅 ${fmt(group[0].key)} – ${fmt(group[group.length-1].key)} · Day ${idx+1} of ${group.length}</div>`;
+    }
+  }
+  const delBtn=ev.id&&!ev.fromICS?`<button class="ev-del" onclick="deleteAndRefresh('${key}','${ev.id}','${ev.uid||''}')">✕</button>`:'';
   el.innerHTML=`<div class="icon">${ev.icon||'📌'}</div>
     <div class="info"><div class="ev-title">${ev.title}${delBtn}</div>
-    <div class="ev-sub">${ev.time||''}</div>${loc}</div>`;
+    <div class="ev-sub">${ev.time||''}</div>${multiInfo}${loc}</div>`;
   return el;
 }
 
-async function deleteAndRefresh(key,id){
+async function deleteAndRefresh(key,id,uid){
   const panel=document.getElementById('sidePanel');
   const y=+panel.dataset.y,m=+panel.dataset.m,d=+panel.dataset.d;
+  if(uid&&uid.startsWith('multi-')){
+    const group=getMultiDayGroup(uid);
+    if(group.length>1){
+      if(!confirm(`Delete all ${group.length} days of "${group[0].ev.title}"?`)){return;}
+      for(const g of group){if(g.ev.id)await deleteEvent(g.key,g.ev.id);}
+      renderCalendar();renderPanelBody(y,m,d);
+      return;
+    }
+  }
   await deleteEvent(key,id);
   renderCalendar();renderPanelBody(y,m,d);
 }
@@ -1063,16 +1116,45 @@ document.getElementById('libAddBtn').addEventListener('click',async()=>{
 // ═══════════════════════════════════════════════
 // ADD EVENT (from panel)
 // ═══════════════════════════════════════════════
+document.getElementById('multiDayChk').addEventListener('change',e=>{
+  const on=e.target.checked;
+  document.getElementById('multiDayFields').style.display=on?'':'none';
+  document.getElementById('newTime').style.display=on?'none':'';
+});
+
 document.getElementById('addEventBtn').addEventListener('click',async()=>{
   const panel=document.getElementById('sidePanel');
   const y=+panel.dataset.y,m=+panel.dataset.m,d=+panel.dataset.d;
   const title=document.getElementById('newTitle').value.trim();
   const time=document.getElementById('newTime').value;
   const person=document.getElementById('newPerson').value;
+  const isMulti=document.getElementById('multiDayChk').checked;
+  const endDateStr=document.getElementById('endDate').value;
   if(!title){document.getElementById('newTitle').focus();return;}
   const icons={dad:'✈️',mom:'💜',charlotte:'⭐',alice:'🎀',family:'🏠'};
-  await addEv(y,m,d,{title,time:fmt12(time),person,icon:icons[person]||'📌'});
+  const icon=icons[person]||'📌';
+
+  if(isMulti){
+    if(!endDateStr){document.getElementById('endDate').focus();return;}
+    const start=new Date(y,m,d);
+    const[ey,em,ed]=endDateStr.split('-').map(Number);
+    const end=new Date(ey,em-1,ed);
+    if(end<start){alert('End date must be on or after the selected day.');return;}
+    const groupUid='multi-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+    const cur=new Date(start);
+    while(cur<=end){
+      await addEv(cur.getFullYear(),cur.getMonth(),cur.getDate(),
+        {title,time:'All Day',person,icon,uid:groupUid});
+      cur.setDate(cur.getDate()+1);
+    }
+  }else{
+    await addEv(y,m,d,{title,time:fmt12(time),person,icon});
+  }
+
   document.getElementById('newTitle').value='';
+  document.getElementById('multiDayChk').checked=false;
+  document.getElementById('multiDayFields').style.display='none';
+  document.getElementById('newTime').style.display='';
   renderCalendar();renderPanelBody(y,m,d);
   if(y===today.getFullYear()&&m===today.getMonth()&&d===today.getDate())renderReminders();
 });
@@ -1096,8 +1178,8 @@ document.getElementById('todayBtn').addEventListener('click',()=>{viewYear=today
 // ═══════════════════════════════════════════════
 async function init(){
   await Promise.all([loadEvents(), loadMeals(), loadMealLib()]);
+  await cleanupSeedData();
   if(Object.keys(events).length===0){
-    await seedDefaults();
     await syncICS();
   }else{
     renderCalendar();
