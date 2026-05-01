@@ -685,6 +685,19 @@ async function decrementMealUsage(id) {
 // ═══════════════════════════════════════════════
 function loadSideLib() {
   sideLib = lsGet('fam-sidelib-v1') || defaultSideLib();
+  cleanupDefaultSides();
+}
+
+function cleanupDefaultSides() {
+  if (lsGet('fam-sidelib-cleanup-v1')) return;
+  const drop = new Set(['Garden Salad','Bread','Mashed Potatoes','Corn','Fries']);
+  const before = sideLib.length;
+  sideLib = sideLib.filter(s => !drop.has(s.name));
+  if (sideLib.length < before) {
+    lsSet('fam-sidelib-v1', sideLib);
+    console.log(`🧹 Removed ${before - sideLib.length} default side(s) from library.`);
+  }
+  lsSet('fam-sidelib-cleanup-v1', true);
 }
 function addToSideLib(name, icon) {
   const item = { id:'side-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
@@ -712,13 +725,8 @@ function decrementSideUsage(id) {
 }
 function defaultSideLib() {
   return [
-    {id:'sd1',name:'Garden Salad',    icon:'🥗',timesUsed:0,lastUsed:null},
-    {id:'sd2',name:'Bread',           icon:'🥖',timesUsed:0,lastUsed:null},
     {id:'sd3',name:'Rice',            icon:'🍚',timesUsed:0,lastUsed:null},
     {id:'sd4',name:'Roasted Veggies', icon:'🥦',timesUsed:0,lastUsed:null},
-    {id:'sd5',name:'Mashed Potatoes', icon:'🥔',timesUsed:0,lastUsed:null},
-    {id:'sd6',name:'Corn',            icon:'🌽',timesUsed:0,lastUsed:null},
-    {id:'sd7',name:'Fries',           icon:'🍟',timesUsed:0,lastUsed:null},
     {id:'sd8',name:'Fruit',           icon:'🍎',timesUsed:0,lastUsed:null},
   ];
 }
