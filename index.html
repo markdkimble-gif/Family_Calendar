@@ -1143,11 +1143,13 @@ function buildDayCell(year,month,day,isCur,opts={}){
   numEl.className='day-num';numEl.textContent=day;
   cell.appendChild(numEl);
   const isMulti=e=>e.uid&&e.uid.startsWith('multi-');
+  const isAllDaySingle=e=>!isMulti(e)&&e.time==='All Day';
   const sorted=[
+    ...dayEvs.filter(isAllDaySingle),
     ...dayEvs.filter(isMulti).sort((a,b)=>a.uid.localeCompare(b.uid)),
-    ...dayEvs.filter(e=>!isMulti(e)&&e.fromICS&&e.person==='charlotte'),
-    ...dayEvs.filter(e=>!isMulti(e)&&e.fromICS&&e.person==='alice'),
-    ...dayEvs.filter(e=>!isMulti(e)&&!e.fromICS),
+    ...dayEvs.filter(e=>!isMulti(e)&&!isAllDaySingle(e)&&e.fromICS&&e.person==='charlotte'),
+    ...dayEvs.filter(e=>!isMulti(e)&&!isAllDaySingle(e)&&e.fromICS&&e.person==='alice'),
+    ...dayEvs.filter(e=>!isMulti(e)&&!isAllDaySingle(e)&&!e.fromICS),
   ];
   const MAX=detail?Infinity:3;
   sorted.slice(0,MAX).forEach(ev=>{
@@ -1358,7 +1360,12 @@ function renderPanelBody(y,m,d){
   if(!evs.length){body.innerHTML='<div class="empty-day">No events — enjoy the free day! 🌤️</div>';return;}
   const cSoccer=evs.filter(e=>e.fromICS&&e.person==='charlotte');
   const aSoccer=evs.filter(e=>e.fromICS&&e.person==='alice');
-  const personal=evs.filter(e=>!e.fromICS);
+  const isMultiP=e=>e.uid&&e.uid.startsWith('multi-');
+  const isAllDayP=e=>!isMultiP(e)&&e.time==='All Day';
+  const personal=evs.filter(e=>!e.fromICS).sort((a,b)=>{
+    const rank=e=>isAllDayP(e)?0:(isMultiP(e)?1:2);
+    return rank(a)-rank(b);
+  });
   if(cSoccer.length){addSection(body,'🟠 Charlotte – NSSA 2014G');cSoccer.forEach(ev=>body.appendChild(mkEvent(ev,key)));}
   if(aSoccer.length){addSection(body,'🩵 Alice – NSSA 2017G');aSoccer.forEach(ev=>body.appendChild(mkEvent(ev,key)));}
   if(personal.length){addSection(body,'👨‍👩‍👧‍👦 Family Events');personal.forEach(ev=>body.appendChild(mkEvent(ev,key)));}
