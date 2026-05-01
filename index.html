@@ -67,6 +67,17 @@ transition:all .15s;display:flex;align-items:center;gap:5px;}
 width:32px;height:32px;font-size:.95rem;cursor:pointer;display:flex;align-items:center;
 justify-content:center;transition:background .15s;}
 .theme-toggle:hover{background:var(--dad-lt);}
+.view-mode-pills{display:flex;gap:2px;background:var(--bg);border:2px solid var(--border);
+border-radius:18px;padding:2px;}
+.view-mode-btn{background:none;border:none;padding:4px 11px;font-family:'Nunito',sans-serif;
+font-weight:700;font-size:.75rem;cursor:pointer;border-radius:14px;color:var(--muted);
+transition:all .15s;}
+.view-mode-btn.active{background:var(--dad);color:#fff;}
+.view-mode-btn:not(.active):hover{color:var(--text);}
+.cal-multi{display:flex;flex-direction:column;gap:24px;}
+.month-section{display:flex;flex-direction:column;gap:5px;}
+.month-section-title{font-family:'Fredoka One',cursive;font-size:1.05rem;color:var(--dad);
+margin-top:4px;}
 .legend{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-left:auto;}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:.76rem;font-weight:700;}
 .legend-dot{width:11px;height:11px;border-radius:50%;}
@@ -310,6 +321,11 @@ color:var(--muted);transition:all .15s;}
     <button class="btn-nav" id="nextBtn">▶</button>
   </div>
   <button class="btn-today" id="todayBtn">Today</button>
+  <div class="view-mode-pills" id="viewModePills">
+    <button class="view-mode-btn" data-mode="week">Week</button>
+    <button class="view-mode-btn" data-mode="month">Month</button>
+    <button class="view-mode-btn" data-mode="quarter">3 Months</button>
+  </div>
   <button class="sync-btn" id="syncBtn">⚽ Sync Soccer</button>
   <button class="meal-lib-btn" id="mealLibBtn">🍽️ Meal Library</button>
   <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">🌙</button>
@@ -327,7 +343,7 @@ color:var(--muted);transition:all .15s;}
 
 <div class="calendar-wrap">
   <div id="reminderArea"></div>
-  <div class="day-labels">
+  <div class="day-labels top-labels" id="topDayLabels">
     <div class="day-label">Sun</div><div class="day-label">Mon</div>
     <div class="day-label">Tue</div><div class="day-label">Wed</div>
     <div class="day-label">Thu</div><div class="day-label">Fri</div>
@@ -454,6 +470,8 @@ const PROXY = 'https://api.allorigins.win/raw?url=';
 const today = new Date();
 let viewYear  = today.getFullYear();
 let viewMonth = today.getMonth();
+let viewDay   = today.getDate();
+let viewMode  = localStorage.getItem('fam-view-mode') || 'month'; // 'week' | 'month' | 'quarter'
 let events    = {}; // "Y-M-D" → [{id,title,person,time,icon,location,uid,fromICS}]
 let meals     = {}; // "Y-M-D" → {id, mealId, name, icon}   (one dinner per day)
 let mealLib   = []; // [{id, name, icon, timesUsed, lastUsed}]
@@ -771,104 +789,157 @@ function renderReminders(){
 const MONTHS=['January','February','March','April','May','June',
               'July','August','September','October','November','December'];
 
-function renderCalendar(){
-  document.getElementById('monthTitle').textContent=`${MONTHS[viewMonth]} ${viewYear}`;
-  const grid=document.getElementById('calGrid');
-  grid.innerHTML='';
+function buildDayCell(year,month,day,isCur){
+  const isToday=day===today.getDate()&&month===today.getMonth()&&year===today.getFullYear();
+  const key=`${year}-${month}-${day}`;
+  const dayEvs=events[key]||[];
+  const cell=document.createElement('div');
+  cell.className='cal-cell'+(isCur?'':' other-month')+(isToday?' today':'');
+  const numEl=document.createElement('div');
+  numEl.className='day-num';numEl.textContent=day;
+  cell.appendChild(numEl);
+  const sorted=[
+    ...dayEvs.filter(e=>e.fromICS&&e.person==='charlotte'),
+    ...dayEvs.filter(e=>e.fromICS&&e.person==='alice'),
+    ...dayEvs.filter(e=>!e.fromICS),
+  ];
+  const MAX=3;
+  sorted.slice(0,MAX).forEach(ev=>{
+    const chip=document.createElement('div');
+    let cls=`event-chip ${ev.person}`;
+    let tipExtra='';
+    if(ev.uid&&ev.uid.startsWith('multi-')){
+      const group=getMultiDayGroup(ev.uid);
+      if(group.length>1){
+        const idx=group.findIndex(g=>g.key===key);
+        if(idx>0)cls+=' multi-day-cont';
+        tipExtra=` · Day ${idx+1} of ${group.length}`;
+      }
+    }
+    chip.className=cls;
+    chip.textContent=(ev.icon?ev.icon+' ':'')+ev.title;
+    chip.title=ev.title+(ev.time?' · '+ev.time:'')+tipExtra;
+    cell.appendChild(chip);
+  });
+  if(sorted.length>MAX){
+    const more=document.createElement('div');
+    more.className='more-chip';
+    more.textContent=`+${sorted.length-MAX} more`;
+    cell.appendChild(more);
+  }
+  cell.addEventListener('click',()=>openPanel(year,month,day,'events'));
+  return cell;
+}
 
-  const firstDay=new Date(viewYear,viewMonth,1).getDay();
-  const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
-  const prevDays=new Date(viewYear,viewMonth,0).getDate();
+function buildMealCell(year,month,day,isCur){
+  const key=`${year}-${month}-${day}`;
+  const meal=meals[key];
+  const cell=document.createElement('div');
+  cell.className='meal-strip-cell'+(isCur?'':' other-month-meal');
+  if(meal){
+    cell.innerHTML=`
+      <span class="meal-icon">${meal.icon||'🍽️'}</span>
+      <span class="meal-name">${meal.name}</span>
+      <button class="meal-del" title="Remove meal" onclick="event.stopPropagation();removeMealFromStrip('${key}')">✕</button>`;
+  }else{
+    cell.innerHTML=`<span class="meal-empty">+ dinner</span>`;
+  }
+  cell.addEventListener('click',()=>openPanel(year,month,day,'meal'));
+  return cell;
+}
+
+function buildWeekRow(grid,weekStart,refMonth,refYear){
+  for(let dow=0;dow<7;dow++){
+    const d=new Date(weekStart);d.setDate(weekStart.getDate()+dow);
+    const isCur=refMonth==null||(d.getMonth()===refMonth&&d.getFullYear()===refYear);
+    grid.appendChild(buildDayCell(d.getFullYear(),d.getMonth(),d.getDate(),isCur));
+  }
+  const strip=document.createElement('div');
+  strip.className='meal-strip';
+  for(let dow=0;dow<7;dow++){
+    const d=new Date(weekStart);d.setDate(weekStart.getDate()+dow);
+    const isCur=refMonth==null||(d.getMonth()===refMonth&&d.getFullYear()===refYear);
+    strip.appendChild(buildMealCell(d.getFullYear(),d.getMonth(),d.getDate(),isCur));
+  }
+  grid.appendChild(strip);
+}
+
+function fillMonthGrid(grid,year,month){
+  const firstDay=new Date(year,month,1).getDay();
+  const daysInMonth=new Date(year,month+1,0).getDate();
   const total=Math.ceil((firstDay+daysInMonth)/7)*7;
+  const startDate=new Date(year,month,1-firstDay);
+  for(let week=0;week<total/7;week++){
+    const ws=new Date(startDate);ws.setDate(startDate.getDate()+week*7);
+    buildWeekRow(grid,ws,month,year);
+  }
+}
 
-  for(let week=0; week<total/7; week++){
-    // 7 day cells
-    for(let dow=0; dow<7; dow++){
-      const i=week*7+dow;
-      let day,month,year,isCur=true;
-      if(i<firstDay){
-        day=prevDays-firstDay+i+1;month=viewMonth-1;year=viewYear;
-        if(month<0){month=11;year--;}isCur=false;
-      }else if(i>=firstDay+daysInMonth){
-        day=i-firstDay-daysInMonth+1;month=viewMonth+1;year=viewYear;
-        if(month>11){month=0;year++;}isCur=false;
-      }else{day=i-firstDay+1;month=viewMonth;year=viewYear;}
+function makeDayLabels(){
+  const labels=document.createElement('div');
+  labels.className='day-labels';
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(t=>{
+    const e=document.createElement('div');e.className='day-label';e.textContent=t;
+    labels.appendChild(e);
+  });
+  return labels;
+}
 
-      const isToday=day===today.getDate()&&month===today.getMonth()&&year===today.getFullYear();
-      const key=`${year}-${month}-${day}`;
-      const dayEvs=events[key]||[];
+function updateTitle(){
+  const el=document.getElementById('monthTitle');
+  if(viewMode==='week'){
+    const anchor=new Date(viewYear,viewMonth,viewDay);
+    const sun=new Date(anchor);sun.setDate(anchor.getDate()-anchor.getDay());
+    const sat=new Date(sun);sat.setDate(sun.getDate()+6);
+    const fmt=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    el.textContent=`${fmt(sun)} – ${fmt(sat)}, ${sat.getFullYear()}`;
+  }else if(viewMode==='quarter'){
+    let endM=viewMonth+2,endY=viewYear;
+    if(endM>11){endM-=12;endY++;}
+    const sameYear=endY===viewYear;
+    el.textContent=sameYear
+      ?`${MONTHS[viewMonth].slice(0,3)} – ${MONTHS[endM].slice(0,3)} ${viewYear}`
+      :`${MONTHS[viewMonth].slice(0,3)} ${viewYear} – ${MONTHS[endM].slice(0,3)} ${endY}`;
+  }else{
+    el.textContent=`${MONTHS[viewMonth]} ${viewYear}`;
+  }
+}
 
-      const cell=document.createElement('div');
-      cell.className='cal-cell'+(isCur?'':' other-month')+(isToday?' today':'');
-      const numEl=document.createElement('div');
-      numEl.className='day-num';numEl.textContent=day;
-      cell.appendChild(numEl);
-
-      const sorted=[
-        ...dayEvs.filter(e=>e.fromICS&&e.person==='charlotte'),
-        ...dayEvs.filter(e=>e.fromICS&&e.person==='alice'),
-        ...dayEvs.filter(e=>!e.fromICS),
-      ];
-      const MAX=3;
-      sorted.slice(0,MAX).forEach(ev=>{
-        const chip=document.createElement('div');
-        let cls=`event-chip ${ev.person}`;
-        let tipExtra='';
-        if(ev.uid&&ev.uid.startsWith('multi-')){
-          const group=getMultiDayGroup(ev.uid);
-          if(group.length>1){
-            const idx=group.findIndex(g=>g.key===key);
-            if(idx>0)cls+=' multi-day-cont';
-            tipExtra=` · Day ${idx+1} of ${group.length}`;
-          }
-        }
-        chip.className=cls;
-        chip.textContent=(ev.icon?ev.icon+' ':'')+ev.title;
-        chip.title=ev.title+(ev.time?' · '+ev.time:'')+tipExtra;
-        cell.appendChild(chip);
-      });
-      if(sorted.length>MAX){
-        const more=document.createElement('div');
-        more.className='more-chip';
-        more.textContent=`+${sorted.length-MAX} more`;
-        cell.appendChild(more);
-      }
-      cell.addEventListener('click',()=>openPanel(year,month,day,'events'));
-      grid.appendChild(cell);
+function renderCalendar(){
+  updateTitle();
+  document.querySelectorAll('.view-mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===viewMode));
+  const topLabels=document.getElementById('topDayLabels');
+  const container=document.getElementById('calGrid');
+  container.innerHTML='';
+  if(viewMode==='quarter'){
+    topLabels.style.display='none';
+    container.className='cal-multi';
+    for(let i=0;i<3;i++){
+      let m=viewMonth+i,y=viewYear;
+      if(m>11){m-=12;y++;}
+      const section=document.createElement('div');
+      section.className='month-section';
+      const title=document.createElement('div');
+      title.className='month-section-title';
+      title.textContent=`${MONTHS[m]} ${y}`;
+      section.appendChild(title);
+      section.appendChild(makeDayLabels());
+      const grid=document.createElement('div');
+      grid.className='cal-grid';
+      fillMonthGrid(grid,y,m);
+      section.appendChild(grid);
+      container.appendChild(section);
     }
-
-    // Meal strip row spanning all 7 columns
-    const strip=document.createElement('div');
-    strip.className='meal-strip';
-    for(let dow=0;dow<7;dow++){
-      const i=week*7+dow;
-      let day,month,year,isCur=true;
-      if(i<firstDay){
-        day=prevDays-firstDay+i+1;month=viewMonth-1;year=viewYear;
-        if(month<0){month=11;year--;}isCur=false;
-      }else if(i>=firstDay+daysInMonth){
-        day=i-firstDay-daysInMonth+1;month=viewMonth+1;year=viewYear;
-        if(month>11){month=0;year++;}isCur=false;
-      }else{day=i-firstDay+1;month=viewMonth;year=viewYear;}
-
-      const key=`${year}-${month}-${day}`;
-      const meal=meals[key];
-      const cell=document.createElement('div');
-      cell.className='meal-strip-cell'+(isCur?'':' other-month-meal');
-
-      if(meal){
-        cell.innerHTML=`
-          <span class="meal-icon">${meal.icon||'🍽️'}</span>
-          <span class="meal-name">${meal.name}</span>
-          <button class="meal-del" title="Remove meal" onclick="event.stopPropagation();removeMealFromStrip('${key}')">✕</button>`;
-        cell.addEventListener('click',()=>openPanel(year,month,day,'meal'));
-      }else{
-        cell.innerHTML=`<span class="meal-empty">+ dinner</span>`;
-        cell.addEventListener('click',()=>openPanel(year,month,day,'meal'));
-      }
-      strip.appendChild(cell);
-    }
-    grid.appendChild(strip);
+  }else if(viewMode==='week'){
+    topLabels.style.display='';
+    container.className='cal-grid';
+    const anchor=new Date(viewYear,viewMonth,viewDay);
+    const sun=new Date(anchor);sun.setDate(anchor.getDate()-anchor.getDay());
+    buildWeekRow(container,sun,null,null);
+  }else{
+    topLabels.style.display='';
+    container.className='cal-grid';
+    fillMonthGrid(container,viewYear,viewMonth);
   }
 }
 
@@ -1209,9 +1280,40 @@ document.getElementById('overlay').addEventListener('click',closePanel);
   });
 })();
 
-document.getElementById('prevBtn').addEventListener('click',()=>{if(--viewMonth<0){viewMonth=11;viewYear--;}renderCalendar();});
-document.getElementById('nextBtn').addEventListener('click',()=>{if(++viewMonth>11){viewMonth=0;viewYear++;}renderCalendar();});
-document.getElementById('todayBtn').addEventListener('click',()=>{viewYear=today.getFullYear();viewMonth=today.getMonth();renderCalendar();});
+function stepView(direction){
+  if(viewMode==='week'){
+    const d=new Date(viewYear,viewMonth,viewDay+direction*7);
+    viewYear=d.getFullYear();viewMonth=d.getMonth();viewDay=d.getDate();
+  }else if(viewMode==='quarter'){
+    viewMonth+=direction*3;viewDay=1;
+    while(viewMonth<0){viewMonth+=12;viewYear--;}
+    while(viewMonth>11){viewMonth-=12;viewYear++;}
+  }else{
+    viewMonth+=direction;viewDay=1;
+    if(viewMonth<0){viewMonth=11;viewYear--;}
+    if(viewMonth>11){viewMonth=0;viewYear++;}
+  }
+  renderCalendar();
+}
+
+document.getElementById('prevBtn').addEventListener('click',()=>stepView(-1));
+document.getElementById('nextBtn').addEventListener('click',()=>stepView(1));
+document.getElementById('todayBtn').addEventListener('click',()=>{
+  viewYear=today.getFullYear();viewMonth=today.getMonth();viewDay=today.getDate();
+  renderCalendar();
+});
+
+document.querySelectorAll('.view-mode-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    viewMode=btn.dataset.mode;
+    localStorage.setItem('fam-view-mode',viewMode);
+    if(viewMode==='week'){
+      if(viewYear!==today.getFullYear()||viewMonth!==today.getMonth())viewDay=1;
+      else viewDay=today.getDate();
+    }
+    renderCalendar();
+  });
+});
 
 // ═══════════════════════════════════════════════
 // BOOT
