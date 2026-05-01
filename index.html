@@ -345,6 +345,12 @@ padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.86re
 font-size:.78rem;cursor:pointer;border:2px solid var(--border);background:var(--bg);
 color:var(--muted);transition:all .15s;}
 .tab-pill.active{background:var(--meal);color:#fff;border-color:var(--meal);}
+.lib-type-toggle{display:flex;gap:6px;margin-bottom:8px;}
+.lib-type-btn{flex:1;padding:8px 12px;border-radius:10px;font-family:'Nunito',sans-serif;
+font-weight:800;font-size:.88rem;cursor:pointer;border:2px solid var(--border);
+background:var(--bg);color:var(--muted);transition:all .15s;}
+.lib-type-btn.active{background:var(--meal);color:#fff;border-color:var(--meal);}
+.lib-type-btn:not(.active):hover{color:var(--text);}
 
 @media(max-width:700px){
 .cal-cell{min-height:70px;}
@@ -478,13 +484,17 @@ color:var(--muted);transition:all .15s;}
 <div class="modal-overlay" id="mealModal">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">🍽️ Meal Library</div>
+      <div class="modal-title" id="mealModalTitle">🍽️ Meal Library</div>
       <button class="btn-close" id="closeMealModal">✕</button>
     </div>
     <div class="modal-body" id="mealModalBody">
+      <div class="lib-type-toggle">
+        <button class="lib-type-btn active" data-libtype="meal">🍽️ Meals</button>
+        <button class="lib-type-btn" data-libtype="side">🥗 Sides</button>
+      </div>
       <div class="tabs-row">
-        <button class="tab-pill active" data-mtab="top">⭐ Top Meals</button>
-        <button class="tab-pill" data-mtab="all">📋 All Meals</button>
+        <button class="tab-pill active" data-mtab="top">⭐ Top</button>
+        <button class="tab-pill" data-mtab="all">📋 All</button>
         <button class="tab-pill" data-mtab="recent">🕐 Recent</button>
       </div>
       <div id="mealModalContent"></div>
@@ -1382,9 +1392,22 @@ document.getElementById('addSideToLib').addEventListener('click',()=>{
 });
 
 // ═══════════════════════════════════════════════
-// MEAL LIBRARY MODAL
+// LIBRARY MODAL — meals + sides
 // ═══════════════════════════════════════════════
 let currentMTab='top';
+let currentLibType='meal'; // 'meal' | 'side'
+let libMealEmoji='🍽️';
+let libSideEmoji='🥗';
+
+function getLibState(){
+  return currentLibType==='side'
+    ?{items:sideLib,noun:'side',titlePlural:'Sides',titleIcon:'🥗',
+      emojis:SIDE_EMOJIS,getEmoji:()=>libSideEmoji,
+      setEmoji:em=>{libSideEmoji=em;},del:deleteSideFromLib,verb:'used'}
+    :{items:mealLib,noun:'meal',titlePlural:'Meals',titleIcon:'🍽️',
+      emojis:MEAL_EMOJIS,getEmoji:()=>libMealEmoji,
+      setEmoji:em=>{libMealEmoji=em;},del:deleteMealFromLib,verb:'cooked'};
+}
 
 document.getElementById('mealLibBtn').addEventListener('click',()=>{
   document.getElementById('mealModal').classList.add('open');
@@ -1406,16 +1429,36 @@ document.querySelectorAll('[data-mtab]').forEach(btn=>{
   });
 });
 
+document.querySelectorAll('[data-libtype]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    currentLibType=btn.dataset.libtype;
+    document.querySelectorAll('[data-libtype]').forEach(b=>b.classList.toggle('active',b===btn));
+    document.getElementById('libEmojiRow')?.remove();
+    renderMealModal();
+  });
+});
+
 function renderMealModal(){
+  const s=getLibState();
+  document.getElementById('mealModalTitle').textContent=`${s.titleIcon} ${s.titlePlural} Library`;
+  document.getElementById('libEmoji').textContent=s.getEmoji();
+  document.getElementById('libMealName').placeholder=`Add new ${s.noun} to library…`;
+  document.querySelectorAll('[data-mtab]').forEach(b=>{
+    const m=b.dataset.mtab;
+    if(m==='top')b.textContent=`⭐ Top ${s.titlePlural}`;
+    else if(m==='all')b.textContent=`📋 All ${s.titlePlural}`;
+    else if(m==='recent')b.textContent='🕐 Recent';
+  });
+
   const cont=document.getElementById('mealModalContent');
   cont.innerHTML='';
-  let sorted=[...mealLib];
+  let sorted=[...s.items];
   if(currentMTab==='top')sorted.sort((a,b)=>(b.timesUsed||0)-(a.timesUsed||0));
   else if(currentMTab==='recent')sorted=sorted.filter(m=>m.lastUsed).sort((a,b)=>b.lastUsed?.localeCompare(a.lastUsed||''));
   else sorted.sort((a,b)=>a.name.localeCompare(b.name));
 
   if(!sorted.length){
-    cont.innerHTML='<div style="color:var(--muted);padding:16px 0;text-align:center;">No meals yet — add some below!</div>';
+    cont.innerHTML=`<div style="color:var(--muted);padding:16px 0;text-align:center;">No ${s.noun}s yet — add some below!</div>`;
     return;
   }
 
@@ -1423,7 +1466,7 @@ function renderMealModal(){
     const el=document.createElement('div');
     el.className='top-meal-item';
     const rank=currentMTab==='top'?`${idx+1}.`:'•';
-    const lastUsed=item.lastUsed?`Last cooked: ${item.lastUsed}`:`Never cooked yet`;
+    const lastUsed=item.lastUsed?`Last ${s.verb}: ${item.lastUsed}`:`Never ${s.verb} yet`;
     el.innerHTML=`
       <div class="tm-rank">${rank}</div>
       <div class="tm-icon">${item.icon}</div>
@@ -1432,33 +1475,38 @@ function renderMealModal(){
         <div class="tm-sub">${lastUsed}</div>
       </div>
       <div class="tm-badge">${item.timesUsed||0}x</div>
-      <button class="tm-del" onclick="deleteMealAndRefresh('${item.id}')">🗑️</button>`;
+      <button class="tm-del" data-id="${item.id}" data-libtype="${currentLibType}-del">🗑️</button>`;
+    el.querySelector('.tm-del').addEventListener('click',(e)=>{
+      e.stopPropagation();
+      deleteLibItemAndRefresh(item.id);
+    });
     cont.appendChild(el);
   });
 }
 
-async function deleteMealAndRefresh(id){
-  if(!confirm('Remove this meal from your library?'))return;
-  await deleteMealFromLib(id);
+async function deleteLibItemAndRefresh(id){
+  const s=getLibState();
+  if(!confirm(`Remove this ${s.noun} from your library?`))return;
+  await s.del(id);
   renderMealModal();
-  renderMealPickerList(document.getElementById('mealSearch').value);
+  if(currentLibType==='side')renderSidePickerList();
+  else renderMealPickerList(document.getElementById('mealSearch').value||'');
 }
 
-// Library modal — add new
-let libSelectedEmoji='🍽️';
+// Library modal — add new (works for whichever type is active)
 document.getElementById('libEmoji').addEventListener('click',()=>{
-  // reuse same emoji modal flow inline
   const existing=document.getElementById('libEmojiRow');
   if(existing){existing.remove();return;}
+  const s=getLibState();
   const row=document.createElement('div');
   row.id='libEmojiRow';row.className='meal-emoji-row';
   row.style.marginTop='8px';
-  MEAL_EMOJIS.forEach(em=>{
+  s.emojis.forEach(em=>{
     const btn=document.createElement('button');
-    btn.className='meal-emoji-btn'+(em===libSelectedEmoji?' selected':'');
+    btn.className='meal-emoji-btn'+(em===s.getEmoji()?' selected':'');
     btn.textContent=em;
     btn.addEventListener('click',()=>{
-      libSelectedEmoji=em;
+      s.setEmoji(em);
       document.getElementById('libEmoji').textContent=em;
       row.querySelectorAll('.meal-emoji-btn').forEach(b=>b.classList.toggle('selected',b.textContent===em));
     });
@@ -1470,11 +1518,14 @@ document.getElementById('libEmoji').addEventListener('click',()=>{
 document.getElementById('libAddBtn').addEventListener('click',async()=>{
   const name=document.getElementById('libMealName').value.trim();
   if(!name)return;
-  await addToMealLib(name,libSelectedEmoji);
+  const s=getLibState();
+  if(currentLibType==='side')addToSideLib(name,s.getEmoji());
+  else await addToMealLib(name,s.getEmoji());
   document.getElementById('libMealName').value='';
   document.getElementById('libEmojiRow')?.remove();
   renderMealModal();
-  renderMealPickerList('');
+  if(currentLibType==='side')renderSidePickerList();
+  else renderMealPickerList('');
 });
 
 // ═══════════════════════════════════════════════
