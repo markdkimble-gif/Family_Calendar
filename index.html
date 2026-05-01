@@ -150,9 +150,9 @@ display:flex;align-items:center;gap:11px;animation:slideIn .4s ease;}
 font-family:'Nunito',sans-serif;font-weight:700;cursor:pointer;font-size:.8rem;white-space:nowrap;}
 
 /* ── CALENDAR GRID ── */
-.day-labels{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:5px;text-align:center;}
+.day-labels{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-bottom:5px;text-align:center;}
 .day-label{font-weight:800;font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:4px;}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;}
 
 /* Each week row = 7 day cells + 1 meal strip spanning full width */
 .week-row{display:contents;}
@@ -183,7 +183,7 @@ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transit
 /* ── WEEKLY MEAL STRIP ── */
 .meal-strip{
 grid-column:1 / -1;
-display:grid; grid-template-columns:repeat(7,1fr); gap:5px;
+display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:5px;
 margin-bottom:5px;
 }
 .meal-strip-cell{
