@@ -488,7 +488,7 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
       <div class="meal-list" id="sidePickerList"></div>
       <div class="meal-section-label">ADD NEW SIDE</div>
       <div style="display:flex;gap:6px;align-items:center;">
-        <span id="selectedSideEmoji" style="font-size:1.4rem;cursor:pointer;" title="Pick emoji">🥗</span>
+        <span id="selectedSideEmoji" style="font-size:1.4rem;cursor:pointer;" title="Pick emoji">🥣</span>
         <div class="meal-add-new" style="flex:1;">
           <input type="text" id="newSideName" placeholder="e.g. Caesar Salad">
           <button id="addSideToLib">Add</button>
@@ -510,7 +510,7 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
     <div class="modal-body" id="mealModalBody">
       <div class="lib-type-toggle">
         <button class="lib-type-btn active" data-libtype="meal">🍽️ Meals</button>
-        <button class="lib-type-btn" data-libtype="side">🥗 Sides</button>
+        <button class="lib-type-btn" data-libtype="side">🥣 Sides</button>
       </div>
       <div class="tabs-row">
         <button class="tab-pill active" data-mtab="top">⭐ Top</button>
@@ -754,7 +754,7 @@ function cleanupDefaultSides() {
 }
 function addToSideLib(name, icon) {
   const item = { id:'side-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
-    name, icon:icon||'🥗', timesUsed:0, lastUsed:null };
+    name, icon:icon||'🥣', timesUsed:0, lastUsed:null };
   sideLib.push(item);
   lsSet('fam-sidelib-v1', sideLib);
   return item;
@@ -1037,10 +1037,10 @@ function buildMealCell(year,month,day,isCur){
   const hasMain=meal&&meal.name;
   const hasSides=meal&&meal.sides&&meal.sides.length;
   if(hasMain||hasSides){
-    const sidesStr=hasSides?meal.sides.map(s=>s.icon||'🥗').join(''):'';
+    const sidesStr=hasSides?meal.sides.map(s=>s.icon||'🥣').join(''):'';
     const mainPart=hasMain
       ?`<span class="meal-icon">${meal.icon||'🍽️'}</span><span class="meal-name">${meal.name}${sidesStr?' · '+sidesStr:''}</span>`
-      :`<span class="meal-icon">🥗</span><span class="meal-name">${sidesStr}</span>`;
+      :`<span class="meal-icon">🥣</span><span class="meal-name">${sidesStr}</span>`;
     cell.innerHTML=`${mainPart}
       <button class="meal-del" title="Remove meal" onclick="event.stopPropagation();removeMealFromStrip('${key}')">✕</button>`;
   }else{
@@ -1240,9 +1240,9 @@ async function deleteAndRefresh(key,id,uid){
 // MEAL PICKER (in side panel)
 // ═══════════════════════════════════════════════
 const MEAL_EMOJIS=['🍽️','🌮','🍝','🍗','🍕','🍔','🥢','🧀','🥣','🔥','🐟','🥞','🫓','🍜','🥗','🍣','🥩','🍲','🌯','🥙'];
-const SIDE_EMOJIS=['🥗','🥖','🍚','🥦','🥔','🌽','🍟','🍎','🍞','🥒','🥕','🍅','🥑','🫘','🍇','🍓','🍌','🥬','🧅','🍐'];
+const SIDE_EMOJIS=['🥣','🥗','🥖','🍚','🥦','🥔','🌽','🍟','🍎','🍞','🥒','🥕','🍅','🥑','🫘','🍇','🍓','🍌','🥬','🧅','🍐'];
 let pickerSelectedEmoji='🍽️';
-let sidePickerSelectedEmoji='🥗';
+let sidePickerSelectedEmoji='🥣';
 let mealEmojiAuto=true;     // user is letting the app guess the meal emoji
 let sideEmojiAuto=true;     // user is letting the app guess the side emoji
 let libEmojiAuto=true;      // same for the library modal's add field
@@ -1343,7 +1343,7 @@ function renderCurrentSelection(){
     m.sides.forEach(s=>{
       const chip=document.createElement('span');
       chip.className='side-chip';
-      chip.innerHTML=`${s.icon||'🥗'} ${s.name} <button title="Remove side">✕</button>`;
+      chip.innerHTML=`${s.icon||'🥣'} ${s.name} <button title="Remove side">✕</button>`;
       chip.querySelector('button').addEventListener('click',async()=>{
         await removeSideFromDay(key,s.id);
         renderCalendar();
@@ -1472,7 +1472,7 @@ document.getElementById('addMealToLib').addEventListener('click',async()=>{
 // Live icon guessing — side name
 document.getElementById('newSideName').addEventListener('input',e=>{
   if(!sideEmojiAuto)return;
-  sidePickerSelectedEmoji=guessEmoji(e.target.value,'🥗');
+  sidePickerSelectedEmoji=guessEmoji(e.target.value,'🥣');
   document.getElementById('selectedSideEmoji').textContent=sidePickerSelectedEmoji;
 });
 
@@ -1502,7 +1502,7 @@ document.getElementById('addSideToLib').addEventListener('click',()=>{
   addToSideLib(name,sidePickerSelectedEmoji);
   document.getElementById('newSideName').value='';
   document.getElementById('sideEmojiRow').style.display='none';
-  sidePickerSelectedEmoji='🥗';
+  sidePickerSelectedEmoji='🥣';
   sideEmojiAuto=true;
   document.getElementById('selectedSideEmoji').textContent=sidePickerSelectedEmoji;
   renderSidePickerList();
@@ -1514,11 +1514,11 @@ document.getElementById('addSideToLib').addEventListener('click',()=>{
 let currentMTab='top';
 let currentLibType='meal'; // 'meal' | 'side'
 let libMealEmoji='🍽️';
-let libSideEmoji='🥗';
+let libSideEmoji='🥣';
 
 function getLibState(){
   return currentLibType==='side'
-    ?{items:sideLib,noun:'side',titlePlural:'Sides',titleIcon:'🥗',
+    ?{items:sideLib,noun:'side',titlePlural:'Sides',titleIcon:'🥣',
       emojis:SIDE_EMOJIS,getEmoji:()=>libSideEmoji,
       setEmoji:em=>{libSideEmoji=em;},del:deleteSideFromLib,verb:'used'}
     :{items:mealLib,noun:'meal',titlePlural:'Meals',titleIcon:'🍽️',
@@ -1552,7 +1552,7 @@ document.querySelectorAll('[data-libtype]').forEach(btn=>{
     document.querySelectorAll('[data-libtype]').forEach(b=>b.classList.toggle('active',b===btn));
     document.getElementById('libEmojiRow')?.remove();
     libEmojiAuto=true;
-    if(currentLibType==='side')libSideEmoji='🥗';
+    if(currentLibType==='side')libSideEmoji='🥣';
     else libMealEmoji='🍽️';
     renderMealModal();
   });
@@ -1561,7 +1561,7 @@ document.querySelectorAll('[data-libtype]').forEach(btn=>{
 // Live icon guessing — library modal add field
 document.getElementById('libMealName').addEventListener('input',e=>{
   if(!libEmojiAuto)return;
-  const fallback=currentLibType==='side'?'🥗':'🍽️';
+  const fallback=currentLibType==='side'?'🥣':'🍽️';
   const guessed=guessEmoji(e.target.value,fallback);
   if(currentLibType==='side')libSideEmoji=guessed;
   else libMealEmoji=guessed;
@@ -1654,7 +1654,7 @@ document.getElementById('libAddBtn').addEventListener('click',async()=>{
   else await addToMealLib(name,s.getEmoji());
   document.getElementById('libMealName').value='';
   document.getElementById('libEmojiRow')?.remove();
-  if(currentLibType==='side')libSideEmoji='🥗';
+  if(currentLibType==='side')libSideEmoji='🥣';
   else libMealEmoji='🍽️';
   libEmojiAuto=true;
   renderMealModal();
