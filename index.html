@@ -64,9 +64,12 @@ transition:all .15s;display:flex;align-items:center;gap:5px;}
 padding:5px 13px;font-family:'Nunito',sans-serif;font-weight:700;font-size:.8rem;cursor:pointer;
 transition:all .15s;display:flex;align-items:center;gap:5px;}
 .meal-lib-btn:hover{background:var(--meal);color:#fff;}
-.theme-toggle{background:var(--bg);border:2px solid var(--border);border-radius:50%;
+.theme-toggle,.refresh-btn{background:var(--bg);border:2px solid var(--border);border-radius:50%;
 width:32px;height:32px;font-size:.95rem;cursor:pointer;color:var(--text);display:flex;align-items:center;
 justify-content:center;transition:background .15s;}
+.refresh-btn:hover{background:var(--family-lt);}
+.refresh-btn.spinning{animation:spin 1s linear infinite;pointer-events:none;}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 .theme-toggle:hover{background:var(--dad-lt);}
 .view-mode-pills{display:flex;gap:2px;background:var(--bg);border:2px solid var(--border);
 border-radius:18px;padding:2px;}
@@ -417,6 +420,7 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
   </div>
   <button class="sync-btn" id="syncBtn">⚽ Sync Soccer</button>
   <button class="meal-lib-btn" id="mealLibBtn">🍽️ Meal Library</button>
+  <button class="refresh-btn" id="refreshBtn" title="Refresh from cloud">🔄</button>
   <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">🌙</button>
   <div class="legend" title="Tap a person to filter">
     <div class="legend-item" data-person="dad"><div class="legend-dot" style="background:var(--dad)"></div>Dad</div>
@@ -2389,6 +2393,29 @@ function closePanel(){
 }
 document.getElementById('closePanel').addEventListener('click',closePanel);
 document.getElementById('overlay').addEventListener('click',closePanel);
+
+// Cloud refresh — manual button + auto on visibility return
+let lastRefresh = Date.now();
+async function refreshAll(){
+  const btn = document.getElementById('refreshBtn');
+  if (btn.classList.contains('spinning')) return;
+  btn.classList.add('spinning');
+  try {
+    await Promise.all([loadEvents(), loadMeals(), loadMealLib(), loadSideLib()]);
+    renderCalendar();
+    renderReminders();
+    const p = document.getElementById('sidePanel');
+    if (p.classList.contains('open')) renderPanelBody(+p.dataset.y, +p.dataset.m, +p.dataset.d);
+    lastRefresh = Date.now();
+  } catch(e) { console.warn('Refresh failed:', e.message); }
+  btn.classList.remove('spinning');
+}
+document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && Date.now() - lastRefresh > 30000) {
+    refreshAll();
+  }
+});
 
 // Theme toggle
 (function initTheme(){
