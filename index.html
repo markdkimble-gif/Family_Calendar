@@ -265,6 +265,19 @@ font-family:'Nunito',sans-serif;font-weight:800;font-size:.88rem;cursor:pointer;
 .multi-day-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.78rem;
 font-weight:700;color:var(--text);user-select:none;}
 .multi-day-toggle input{cursor:pointer;width:14px;height:14px;margin:0;}
+.person-pills{display:flex;flex-wrap:wrap;gap:5px;}
+.person-pill{
+  background:var(--bg);border:2px solid var(--border);border-radius:18px;
+  padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:700;font-size:.8rem;
+  cursor:pointer;color:var(--muted);transition:all .15s;user-select:none;
+}
+.person-pill:hover{color:var(--text);}
+.person-pill.active{color:#fff;}
+.person-pill.dad.active{background:var(--dad);border-color:var(--dad);}
+.person-pill.mom.active{background:var(--mom);border-color:var(--mom);}
+.person-pill.charlotte.active{background:var(--charlotte);border-color:var(--charlotte);}
+.person-pill.alice.active{background:var(--alice);border-color:var(--alice);}
+.person-pill.family.active{background:var(--family);border-color:var(--family);}
 .event-chip.multi-day-cont{font-style:italic;opacity:.92;border-left:3px solid currentColor;padding-left:4px;}
 .ev-multi-info{font-size:.72rem;color:var(--muted);margin-top:2px;font-weight:700;}
 
@@ -454,13 +467,14 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
         <label>End date</label>
         <input type="date" id="endDate">
       </div>
-      <select id="newPerson">
-        <option value="family">🏠 Whole Family</option>
-        <option value="dad">🔵 Dad</option>
-        <option value="mom">🟣 Mom</option>
-        <option value="charlotte">🟠 Charlotte</option>
-        <option value="alice">🩵 Alice</option>
-      </select>
+      <label>Who? (tap one or more)</label>
+      <div class="person-pills" id="newPersonPills">
+        <button type="button" class="person-pill family" data-person="family">🏠 Family</button>
+        <button type="button" class="person-pill dad" data-person="dad">🔵 Dad</button>
+        <button type="button" class="person-pill mom" data-person="mom">🟣 Mom</button>
+        <button type="button" class="person-pill charlotte" data-person="charlotte">🟠 Charlotte</button>
+        <button type="button" class="person-pill alice" data-person="alice">🩵 Alice</button>
+      </div>
       <button class="btn-add" id="addEventBtn">Add to Calendar</button>
     </div>
   </div>
@@ -543,14 +557,14 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
       <div class="add-form" style="padding:0;border:none;">
         <label>Title</label>
         <input type="text" id="editTitle">
-        <label>Person</label>
-        <select id="editPerson">
-          <option value="family">🏠 Whole Family</option>
-          <option value="dad">🔵 Dad</option>
-          <option value="mom">🟣 Mom</option>
-          <option value="charlotte">🟠 Charlotte</option>
-          <option value="alice">🩵 Alice</option>
-        </select>
+        <label>Who? (tap one or more)</label>
+        <div class="person-pills" id="editPersonPills">
+          <button type="button" class="person-pill family" data-person="family">🏠 Family</button>
+          <button type="button" class="person-pill dad" data-person="dad">🔵 Dad</button>
+          <button type="button" class="person-pill mom" data-person="mom">🟣 Mom</button>
+          <button type="button" class="person-pill charlotte" data-person="charlotte">🟠 Charlotte</button>
+          <button type="button" class="person-pill alice" data-person="alice">🩵 Alice</button>
+        </div>
         <label class="multi-day-toggle">
           <input type="checkbox" id="editMultiChk"> Multi-day event
         </label>
@@ -627,14 +641,15 @@ async function loadEvents() {
     console.warn('Events load failed, using cache:', e.message);
     events = lsGet('fam-events-v6') || {};
   }
-  // Migration: any event missing an id (saved before local-id fallback existed) gets one now
-  let assigned = 0;
+  // Migration: backfill missing ids and persons arrays
+  let migrated = 0;
   for (const k of Object.keys(events)) {
     for (const ev of events[k]) {
-      if (!ev.id) { ev.id = 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2,6); assigned++; }
+      if (!ev.id) { ev.id = 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2,6); migrated++; }
+      if (!ev.persons) { ev.persons = ev.person ? [ev.person] : []; migrated++; }
     }
   }
-  if (assigned) lsSet('fam-events-v6', events);
+  if (migrated) lsSet('fam-events-v6', events);
 }
 
 async function saveEvent(key, ev) {
@@ -1016,6 +1031,53 @@ function renderReminders(){
 }
 
 // ═══════════════════════════════════════════════
+// PERSON PILLS (multi-select)
+// ═══════════════════════════════════════════════
+const PERSON_ICONS={dad:'✈️',mom:'💜',charlotte:'⭐',alice:'🎀',family:'🏠'};
+
+function initPersonPills(containerId){
+  document.querySelectorAll(`#${containerId} .person-pill`).forEach(el=>{
+    el.addEventListener('click',()=>{
+      const person=el.dataset.person;
+      const wasActive=el.classList.contains('active');
+      const allPills=document.querySelectorAll(`#${containerId} .person-pill`);
+      if(person==='family'){
+        allPills.forEach(b=>b.classList.remove('active'));
+        if(!wasActive)el.classList.add('active');
+      }else{
+        const familyEl=document.querySelector(`#${containerId} .person-pill.family`);
+        if(familyEl)familyEl.classList.remove('active');
+        el.classList.toggle('active');
+      }
+    });
+  });
+}
+function getSelectedPersons(containerId){
+  return [...document.querySelectorAll(`#${containerId} .person-pill.active`)].map(el=>el.dataset.person);
+}
+function setSelectedPersons(containerId,persons){
+  const set=new Set(persons||[]);
+  document.querySelectorAll(`#${containerId} .person-pill`).forEach(el=>{
+    el.classList.toggle('active',set.has(el.dataset.person));
+  });
+}
+function applyPersonStyle(el,ev){
+  const persons=ev.persons||(ev.person?[ev.person]:[]);
+  if(persons.length>1){
+    const stops=persons.map((p,i)=>{
+      const a=(i/persons.length)*100;
+      const b=((i+1)/persons.length)*100;
+      return `var(--${p}-lt) ${a}%, var(--${p}-lt) ${b}%`;
+    }).join(', ');
+    el.style.background=`linear-gradient(135deg, ${stops})`;
+    el.style.color='var(--text)';
+  }
+}
+
+initPersonPills('newPersonPills');
+initPersonPills('editPersonPills');
+
+// ═══════════════════════════════════════════════
 // CALENDAR RENDER
 // ═══════════════════════════════════════════════
 const MONTHS=['January','February','March','April','May','June',
@@ -1054,6 +1116,7 @@ function buildDayCell(year,month,day,isCur,opts={}){
       }
     }
     chip.className=cls;
+    applyPersonStyle(chip,ev);
     chip.title=ev.title+(ev.time?' · '+ev.time:'')+tipExtra;
     if(detail){
       const titleEl=document.createElement('div');
@@ -1258,6 +1321,7 @@ function addSection(parent,label){
 
 function mkEvent(ev,key){
   const el=document.createElement('div');el.className=`panel-event ${ev.person}`;
+  applyPersonStyle(el,ev);
   const loc=ev.location?`<div class="ev-loc">📍 ${ev.location}</div>`:'';
   let multiInfo='';
   if(ev.uid&&ev.uid.startsWith('multi-')){
@@ -1738,12 +1802,13 @@ document.getElementById('addEventBtn').addEventListener('click',async()=>{
   const y=+panel.dataset.y,m=+panel.dataset.m,d=+panel.dataset.d;
   const title=document.getElementById('newTitle').value.trim();
   const time=document.getElementById('newTime').value;
-  const person=document.getElementById('newPerson').value;
+  const persons=getSelectedPersons('newPersonPills');
   const isMulti=document.getElementById('multiDayChk').checked;
   const endDateStr=document.getElementById('endDate').value;
   if(!title){document.getElementById('newTitle').focus();return;}
-  const icons={dad:'✈️',mom:'💜',charlotte:'⭐',alice:'🎀',family:'🏠'};
-  const icon=icons[person]||'📌';
+  if(!persons.length){alert('Pick at least one person.');return;}
+  const icon=persons.map(p=>PERSON_ICONS[p]||'📌').join('');
+  const person=persons[0];
 
   if(isMulti){
     if(!endDateStr){document.getElementById('endDate').focus();return;}
@@ -1755,17 +1820,18 @@ document.getElementById('addEventBtn').addEventListener('click',async()=>{
     const cur=new Date(start);
     while(cur<=end){
       await addEv(cur.getFullYear(),cur.getMonth(),cur.getDate(),
-        {title,time:'All Day',person,icon,uid:groupUid});
+        {title,time:'All Day',person,persons,icon,uid:groupUid});
       cur.setDate(cur.getDate()+1);
     }
   }else{
-    await addEv(y,m,d,{title,time:fmt12(time),person,icon});
+    await addEv(y,m,d,{title,time:fmt12(time),person,persons,icon});
   }
 
   document.getElementById('newTitle').value='';
   document.getElementById('multiDayChk').checked=false;
   document.getElementById('multiDayFields').style.display='none';
   document.getElementById('newTime').style.display='';
+  setSelectedPersons('newPersonPills',[]);
   renderCalendar();
   if(y===today.getFullYear()&&m===today.getMonth()&&d===today.getDate())renderReminders();
   closePanel();
@@ -1796,7 +1862,7 @@ function openEditEvent(key,id){
   editingState={key,id:idStr,uid:ev.uid||'',group};
 
   document.getElementById('editTitle').value=ev.title;
-  document.getElementById('editPerson').value=ev.person;
+  setSelectedPersons('editPersonPills',ev.persons||(ev.person?[ev.person]:[]));
   document.getElementById('editMultiChk').checked=isMulti&&group.length>1;
 
   const startKey=group[0].key;
@@ -1834,11 +1900,12 @@ document.getElementById('editEventModal').addEventListener('click',e=>{
 document.getElementById('editSaveBtn').addEventListener('click',async()=>{
   if(!editingState)return;
   const title=document.getElementById('editTitle').value.trim();
-  const person=document.getElementById('editPerson').value;
+  const persons=getSelectedPersons('editPersonPills');
   const isMulti=document.getElementById('editMultiChk').checked;
   if(!title){document.getElementById('editTitle').focus();return;}
-  const icons={dad:'✈️',mom:'💜',charlotte:'⭐',alice:'🎀',family:'🏠'};
-  const icon=icons[person]||'📌';
+  if(!persons.length){alert('Pick at least one person.');return;}
+  const icon=persons.map(p=>PERSON_ICONS[p]||'📌').join('');
+  const person=persons[0];
 
   // Wipe existing days/group
   for(const g of editingState.group){if(g.ev.id)await deleteEvent(g.key,g.ev.id);}
@@ -1856,7 +1923,7 @@ document.getElementById('editSaveBtn').addEventListener('click',async()=>{
     const cur=new Date(start);
     while(cur<=end){
       await addEv(cur.getFullYear(),cur.getMonth(),cur.getDate(),
-        {title,time:'All Day',person,icon,uid:groupUid});
+        {title,time:'All Day',person,persons,icon,uid:groupUid});
       cur.setDate(cur.getDate()+1);
     }
   }else{
@@ -1864,7 +1931,7 @@ document.getElementById('editSaveBtn').addEventListener('click',async()=>{
     if(!dateStr){alert('Pick a date.');return;}
     const[y,m,d]=dateStr.split('-').map(Number);
     const time=document.getElementById('editTime').value;
-    await addEv(y,m-1,d,{title,time:fmt12(time),person,icon});
+    await addEv(y,m-1,d,{title,time:fmt12(time),person,persons,icon});
   }
 
   document.getElementById('editEventModal').classList.remove('open');
