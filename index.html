@@ -230,8 +230,14 @@ transition:all .15s;margin-bottom:-2px;}
 .panel-tab-content{display:none;flex:1;overflow-y:auto;flex-direction:column;}
 .panel-tab-content.active{display:flex;}
 
-.panel-header{padding:14px 20px 10px;border-bottom:2px solid var(--border);display:flex;align-items:center;gap:10px;}
-.panel-date{font-family:'Fredoka One',cursive;font-size:1.2rem;flex:1;}
+.panel-header{padding:14px 20px 10px;border-bottom:2px solid var(--border);display:flex;align-items:flex-start;gap:10px;}
+.panel-date{font-family:'Fredoka One',cursive;font-size:1.2rem;}
+.days-away{display:inline-block;margin-top:5px;padding:3px 11px;border-radius:14px;
+font-size:.78rem;font-weight:800;background:var(--family-lt);color:var(--family-text);}
+.days-away.today{background:var(--dad);color:#fff;animation:pulse 2s ease-in-out infinite;}
+.days-away.soon{background:var(--mom-lt);color:var(--mom-text);}
+.days-away.past{background:var(--bg);color:var(--muted);}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
 .btn-close{background:var(--bg);border:2px solid var(--border);border-radius:50%;
 width:32px;height:32px;font-size:1.05rem;cursor:pointer;color:var(--text);display:flex;align-items:center;justify-content:center;}
 .btn-close:hover{background:var(--danger-hover);}
@@ -453,7 +459,10 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
 
 <div class="side-panel" id="sidePanel">
   <div class="panel-header">
-    <div class="panel-date" id="panelDate">Select a day</div>
+    <div style="flex:1;min-width:0;">
+      <div class="panel-date" id="panelDate">Select a day</div>
+      <div class="days-away" id="daysAway"></div>
+    </div>
     <button class="btn-close" id="closePanel">✕</button>
   </div>
   <div class="panel-tabs">
@@ -1665,11 +1674,31 @@ async function removeMealFromStrip(key){
 // ═══════════════════════════════════════════════
 // SIDE PANEL
 // ═══════════════════════════════════════════════
+function daysAwayInfo(y,m,d){
+  const now=new Date();now.setHours(0,0,0,0);
+  const target=new Date(y,m,d);target.setHours(0,0,0,0);
+  const days=Math.round((target-now)/(1000*60*60*24));
+  if(days===0)return{text:'🎉 That\'s TODAY!',cls:'today'};
+  if(days===1)return{text:'⏰ Tomorrow!',cls:'soon'};
+  if(days===-1)return{text:'🕰 Yesterday',cls:'past'};
+  if(days>1&&days<=7)return{text:`✨ Just ${days} days away!`,cls:'soon'};
+  if(days>7&&days<=30)return{text:`📅 ${days} days away`,cls:''};
+  if(days>30){
+    const weeks=Math.round(days/7);
+    return{text:`📅 ${days} days (${weeks} weeks) away`,cls:''};
+  }
+  return{text:`🕰 ${Math.abs(days)} days ago`,cls:'past'};
+}
+
 function openPanel(y,m,d,tab='events'){
   const panel=document.getElementById('sidePanel');
   panel.dataset.y=y;panel.dataset.m=m;panel.dataset.d=d;
   document.getElementById('panelDate').textContent=
     new Date(y,m,d).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  const da=daysAwayInfo(y,m,d);
+  const daEl=document.getElementById('daysAway');
+  daEl.textContent=da.text;
+  daEl.className='days-away'+(da.cls?' '+da.cls:'');
   switchPanelTab(tab);
   panel.classList.add('open');
   document.getElementById('overlay').classList.add('open');
