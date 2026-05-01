@@ -245,10 +245,12 @@ letter-spacing:.07em;color:var(--muted);margin-top:6px;}
 .panel-event.meal     {background:var(--meal-lt);}
 .empty-day{text-align:center;color:var(--muted);font-weight:600;padding:26px 0;font-size:.88rem;}
 
-/* Event delete button */
-.ev-del{float:right;background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem;
-padding:0 2px;opacity:0;transition:opacity .15s;}
-.panel-event:hover .ev-del{opacity:1;}
+/* Event action buttons (edit / delete) */
+.ev-actions{float:right;display:inline-flex;gap:2px;}
+.ev-edit,.ev-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;
+padding:0 4px;opacity:.85;transition:opacity .15s,color .15s,transform .1s;border-radius:4px;}
+.ev-edit:hover,.ev-edit:active{opacity:1;color:var(--dad);transform:scale(1.15);}
+.ev-del:hover,.ev-del:active{opacity:1;color:#ef4444;transform:scale(1.15);}
 
 /* Add event form */
 .add-form{padding:12px 20px 20px;border-top:2px solid var(--border);display:flex;flex-direction:column;gap:7px;}
@@ -529,6 +531,50 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
   </div>
 </div>
 
+<!-- ── EDIT EVENT MODAL ── -->
+
+<div class="modal-overlay" id="editEventModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Edit Event</div>
+      <button class="btn-close" id="closeEditModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="add-form" style="padding:0;border:none;">
+        <label>Title</label>
+        <input type="text" id="editTitle">
+        <label>Person</label>
+        <select id="editPerson">
+          <option value="family">🏠 Whole Family</option>
+          <option value="dad">🔵 Dad</option>
+          <option value="mom">🟣 Mom</option>
+          <option value="charlotte">🟠 Charlotte</option>
+          <option value="alice">🩵 Alice</option>
+        </select>
+        <label class="multi-day-toggle">
+          <input type="checkbox" id="editMultiChk"> Multi-day event
+        </label>
+        <div id="editSingleFields">
+          <label>Date</label>
+          <input type="date" id="editDate">
+          <label>Time</label>
+          <input type="time" id="editTime">
+        </div>
+        <div id="editMultiFields" style="display:none;">
+          <label>Start date</label>
+          <input type="date" id="editStartDate">
+          <label>End date</label>
+          <input type="date" id="editEndDate">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px;">
+      <button class="btn-add" id="editDeleteBtn" style="background:#ef4444;flex:0 0 auto;padding:8px 14px;">🗑 Delete</button>
+      <button class="btn-add" id="editSaveBtn" style="flex:1;">Save changes</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════
 // SUPABASE CONFIG
@@ -581,6 +627,14 @@ async function loadEvents() {
     console.warn('Events load failed, using cache:', e.message);
     events = lsGet('fam-events-v6') || {};
   }
+  // Migration: any event missing an id (saved before local-id fallback existed) gets one now
+  let assigned = 0;
+  for (const k of Object.keys(events)) {
+    for (const ev of events[k]) {
+      if (!ev.id) { ev.id = 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2,6); assigned++; }
+    }
+  }
+  if (assigned) lsSet('fam-events-v6', events);
 }
 
 async function saveEvent(key, ev) {
@@ -592,11 +646,13 @@ async function saveEvent(key, ev) {
     if (error) throw error;
     ev.id = data.id;
   } catch(e) { console.warn('Save event failed:', e.message); }
+  if (!ev.id) ev.id = 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
   lsSet('fam-events-v6', events);
 }
 
 async function deleteEvent(key, evId) {
-  events[key] = (events[key]||[]).filter(e=>e.id!==evId);
+  const idStr = String(evId);
+  events[key] = (events[key]||[]).filter(e => String(e.id) !== idStr);
   try { await db.from('events').delete().eq('id', evId); } catch(e) { console.warn(e); }
   lsSet('fam-events-v6', events);
 }
@@ -1213,9 +1269,15 @@ function mkEvent(ev,key){
       multiInfo=`<div class="ev-multi-info">📅 ${fmt(group[0].key)} – ${fmt(group[group.length-1].key)} · Day ${idx+1} of ${group.length}</div>`;
     }
   }
-  const delBtn=ev.id&&!ev.fromICS?`<button class="ev-del" onclick="deleteAndRefresh('${key}','${ev.id}','${ev.uid||''}')">✕</button>`:'';
+  let actions='';
+  if(ev.id&&!ev.fromICS){
+    actions=`<span class="ev-actions">`
+      +`<button class="ev-edit" title="Edit" onclick="openEditEvent('${key}','${ev.id}')">✏️</button>`
+      +`<button class="ev-del" title="Delete" onclick="deleteAndRefresh('${key}','${ev.id}','${ev.uid||''}')">✕</button>`
+      +`</span>`;
+  }
   el.innerHTML=`<div class="icon">${ev.icon||'📌'}</div>
-    <div class="info"><div class="ev-title">${ev.title}${delBtn}</div>
+    <div class="info"><div class="ev-title">${ev.title}${actions}</div>
     <div class="ev-sub">${ev.time||''}</div>${multiInfo}${loc}</div>`;
   return el;
 }
@@ -1706,6 +1768,124 @@ document.getElementById('addEventBtn').addEventListener('click',async()=>{
   document.getElementById('newTime').style.display='';
   renderCalendar();renderPanelBody(y,m,d);
   if(y===today.getFullYear()&&m===today.getMonth()&&d===today.getDate())renderReminders();
+});
+
+// ═══════════════════════════════════════════════
+// EDIT EVENT MODAL
+// ═══════════════════════════════════════════════
+let editingState=null; // {key, id, uid, group:[{key,ev}]}
+
+function parse12to24(s){
+  if(!s||s==='All Day')return '';
+  const part=s.split('–')[0].trim();
+  const m=part.match(/^(\d+):(\d{2})\s*(AM|PM)?/i);
+  if(!m)return '';
+  let h=+m[1];const min=m[2];const ap=(m[3]||'').toUpperCase();
+  if(ap==='PM'&&h<12)h+=12;
+  if(ap==='AM'&&h===12)h=0;
+  return String(h).padStart(2,'0')+':'+min;
+}
+
+function openEditEvent(key,id){
+  const idStr=String(id);
+  const ev=(events[key]||[]).find(e=>String(e.id)===idStr);
+  if(!ev)return;
+  const isMulti=ev.uid&&ev.uid.startsWith('multi-');
+  const group=isMulti?getMultiDayGroup(ev.uid):[{key,ev}];
+  editingState={key,id:idStr,uid:ev.uid||'',group};
+
+  document.getElementById('editTitle').value=ev.title;
+  document.getElementById('editPerson').value=ev.person;
+  document.getElementById('editMultiChk').checked=isMulti&&group.length>1;
+
+  const startKey=group[0].key;
+  const endKey=group[group.length-1].key;
+  const[sy,sm,sd]=startKey.split('-').map(Number);
+  const[ey,em,ed]=endKey.split('-').map(Number);
+  document.getElementById('editDate').value=isoDate(sy,sm,sd);
+  document.getElementById('editStartDate').value=isoDate(sy,sm,sd);
+  document.getElementById('editEndDate').value=isoDate(ey,em,ed);
+  document.getElementById('editTime').value=parse12to24(ev.time)||'09:00';
+
+  toggleEditFields(isMulti&&group.length>1);
+  document.getElementById('editEventModal').classList.add('open');
+}
+
+function toggleEditFields(isMulti){
+  document.getElementById('editSingleFields').style.display=isMulti?'none':'';
+  document.getElementById('editMultiFields').style.display=isMulti?'':'none';
+}
+
+document.getElementById('editMultiChk').addEventListener('change',e=>{
+  toggleEditFields(e.target.checked);
+});
+document.getElementById('closeEditModal').addEventListener('click',()=>{
+  document.getElementById('editEventModal').classList.remove('open');
+  editingState=null;
+});
+document.getElementById('editEventModal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('editEventModal')){
+    document.getElementById('editEventModal').classList.remove('open');
+    editingState=null;
+  }
+});
+
+document.getElementById('editSaveBtn').addEventListener('click',async()=>{
+  if(!editingState)return;
+  const title=document.getElementById('editTitle').value.trim();
+  const person=document.getElementById('editPerson').value;
+  const isMulti=document.getElementById('editMultiChk').checked;
+  if(!title){document.getElementById('editTitle').focus();return;}
+  const icons={dad:'✈️',mom:'💜',charlotte:'⭐',alice:'🎀',family:'🏠'};
+  const icon=icons[person]||'📌';
+
+  // Wipe existing days/group
+  for(const g of editingState.group){if(g.ev.id)await deleteEvent(g.key,g.ev.id);}
+
+  if(isMulti){
+    const startStr=document.getElementById('editStartDate').value;
+    const endStr=document.getElementById('editEndDate').value;
+    if(!startStr||!endStr){alert('Set both start and end dates.');return;}
+    const[sy,sm,sd]=startStr.split('-').map(Number);
+    const[ey,em,ed]=endStr.split('-').map(Number);
+    const start=new Date(sy,sm-1,sd);
+    const end=new Date(ey,em-1,ed);
+    if(end<start){alert('End must be on or after start.');return;}
+    const groupUid='multi-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+    const cur=new Date(start);
+    while(cur<=end){
+      await addEv(cur.getFullYear(),cur.getMonth(),cur.getDate(),
+        {title,time:'All Day',person,icon,uid:groupUid});
+      cur.setDate(cur.getDate()+1);
+    }
+  }else{
+    const dateStr=document.getElementById('editDate').value;
+    if(!dateStr){alert('Pick a date.');return;}
+    const[y,m,d]=dateStr.split('-').map(Number);
+    const time=document.getElementById('editTime').value;
+    await addEv(y,m-1,d,{title,time:fmt12(time),person,icon});
+  }
+
+  document.getElementById('editEventModal').classList.remove('open');
+  editingState=null;
+  renderCalendar();renderReminders();
+  const p=document.getElementById('sidePanel');
+  if(p.classList.contains('open'))renderPanelBody(+p.dataset.y,+p.dataset.m,+p.dataset.d);
+});
+
+document.getElementById('editDeleteBtn').addEventListener('click',async()=>{
+  if(!editingState)return;
+  const multi=editingState.group.length>1;
+  const msg=multi
+    ?`Delete all ${editingState.group.length} days of "${editingState.group[0].ev.title}"?`
+    :'Delete this event?';
+  if(!confirm(msg))return;
+  for(const g of editingState.group){if(g.ev.id)await deleteEvent(g.key,g.ev.id);}
+  document.getElementById('editEventModal').classList.remove('open');
+  editingState=null;
+  renderCalendar();renderReminders();
+  const p=document.getElementById('sidePanel');
+  if(p.classList.contains('open'))renderPanelBody(+p.dataset.y,+p.dataset.m,+p.dataset.d);
 });
 
 // ═══════════════════════════════════════════════
