@@ -1966,45 +1966,57 @@ document.getElementById('editEventModal').addEventListener('click',e=>{
 
 document.getElementById('editSaveBtn').addEventListener('click',async()=>{
   if(!editingState)return;
+  // Capture and immediately clear so a second tap can't run this handler twice
+  const state=editingState;
+  editingState=null;
+
+  const restore=()=>{editingState=state;};
   const title=document.getElementById('editTitle').value.trim();
   const persons=getSelectedPersons('editPersonPills');
   const isMulti=document.getElementById('editMultiChk').checked;
-  if(!title){document.getElementById('editTitle').focus();return;}
-  if(!persons.length){alert('Pick at least one person.');return;}
+  if(!title){document.getElementById('editTitle').focus();restore();return;}
+  if(!persons.length){alert('Pick at least one person.');restore();return;}
   const icon=persons.map(p=>PERSON_ICONS[p]||'📌').join('');
   const person=persons[0];
 
-  // Wipe existing days/group
-  for(const g of editingState.group){if(g.ev.id)await deleteEvent(g.key,g.ev.id);}
-
+  // Validate dates BEFORE deleting anything, so a failed validation doesn't orphan events
+  let plan;
   if(isMulti){
     const startStr=document.getElementById('editStartDate').value;
     const endStr=document.getElementById('editEndDate').value;
-    if(!startStr||!endStr){alert('Set both start and end dates.');return;}
+    if(!startStr||!endStr){alert('Set both start and end dates.');restore();return;}
     const[sy,sm,sd]=startStr.split('-').map(Number);
     const[ey,em,ed]=endStr.split('-').map(Number);
     const start=new Date(sy,sm-1,sd);
     const end=new Date(ey,em-1,ed);
-    if(end<start){alert('End must be on or after start.');return;}
+    if(end<start){alert('End must be on or after start.');restore();return;}
+    plan={kind:'multi',start,end};
+  }else{
+    const dateStr=document.getElementById('editDate').value;
+    if(!dateStr){alert('Pick a date.');restore();return;}
+    const[y,m,d]=dateStr.split('-').map(Number);
+    plan={kind:'single',y,m:m-1,d};
+  }
+
+  // Validation passed — now wipe and recreate
+  for(const g of state.group){if(g.ev.id)await deleteEvent(g.key,g.ev.id);}
+
+  if(plan.kind==='multi'){
     const groupUid='multi-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
-    const cur=new Date(start);
-    while(cur<=end){
+    const cur=new Date(plan.start);
+    while(cur<=plan.end){
       await addEv(cur.getFullYear(),cur.getMonth(),cur.getDate(),
         {title,time:'All Day',person,persons,icon,uid:groupUid});
       cur.setDate(cur.getDate()+1);
     }
   }else{
-    const dateStr=document.getElementById('editDate').value;
-    if(!dateStr){alert('Pick a date.');return;}
-    const[y,m,d]=dateStr.split('-').map(Number);
     const allDay=document.getElementById('editAllDayChk').checked;
     const time=document.getElementById('editTime').value;
     const t=allDay?'All Day':fmt12(time);
-    await addEv(y,m-1,d,{title,time:t,person,persons,icon});
+    await addEv(plan.y,plan.m,plan.d,{title,time:t,person,persons,icon});
   }
 
   document.getElementById('editEventModal').classList.remove('open');
-  editingState=null;
   renderCalendar();renderReminders();
   const p=document.getElementById('sidePanel');
   if(p.classList.contains('open'))renderPanelBody(+p.dataset.y,+p.dataset.m,+p.dataset.d);
