@@ -260,6 +260,26 @@ padding:4px 8px;font-size:1.1rem;cursor:pointer;transition:background .15s;}
 .meal-emoji-btn:hover,.meal-emoji-btn.selected{background:var(--meal-hover);border-color:var(--meal);}
 .meal-section-label{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
 
+/* Current selection block in meal picker */
+.current-selection{background:var(--meal-lt);border:2px solid var(--meal-border);border-radius:12px;
+padding:10px 12px;display:flex;flex-direction:column;gap:6px;}
+.current-selection.empty{background:var(--bg);border-color:var(--border);border-style:dashed;}
+.current-empty{color:var(--muted);font-size:.85rem;font-weight:600;text-align:center;padding:2px 0;}
+.current-main{display:flex;align-items:center;gap:8px;font-weight:800;font-size:.92rem;color:var(--meal-text);}
+.current-main .cm-icon{font-size:1.2rem;}
+.current-sides{display:flex;flex-wrap:wrap;gap:5px;}
+.side-chip{background:var(--surface);border:1.5px solid var(--meal-border);border-radius:14px;
+padding:2px 4px 2px 9px;font-size:.78rem;font-weight:700;color:var(--meal-text);
+display:inline-flex;align-items:center;gap:5px;}
+.side-chip button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;
+padding:0 4px;line-height:1;border-radius:50%;}
+.side-chip button:hover{background:var(--danger-hover);color:var(--text);}
+.meal-list-item.active{background:var(--meal);border-color:var(--meal);}
+.meal-list-item.active .ml-name,
+.meal-list-item.active .ml-meta{color:#fff;}
+.meal-list-item.active .ml-times{background:#fff;color:var(--meal-text);}
+.meal-list-item .ml-check{font-weight:800;color:#fff;font-size:1.05rem;}
+
 /* ── MEAL LIBRARY MODAL ── */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;backdrop-filter:blur(3px);}
 .modal-overlay.open{display:flex;align-items:center;justify-content:center;}
@@ -399,10 +419,13 @@ color:var(--muted);transition:all .15s;}
   <div class="panel-tab-content" id="tab-meal">
     <div class="meal-picker" id="mealPicker">
       <div class="meal-picker-title" id="mealPickerTitle">🍽️ What's for dinner?</div>
+
+      <div class="current-selection" id="currentSelection"></div>
+
       <input class="meal-search" id="mealSearch" placeholder="Search meals…" type="text">
-      <div class="meal-section-label">YOUR MEAL LIBRARY</div>
+      <div class="meal-section-label">MAIN DISH — TAP TO ASSIGN</div>
       <div class="meal-list" id="mealPickerList"></div>
-      <div class="meal-section-label">ADD NEW MEAL TO LIBRARY</div>
+      <div class="meal-section-label">ADD NEW MAIN</div>
       <div style="display:flex;gap:6px;align-items:center;">
         <span id="selectedEmoji" style="font-size:1.4rem;cursor:pointer;" title="Pick emoji">🍽️</span>
         <div class="meal-add-new" style="flex:1;">
@@ -410,9 +433,19 @@ color:var(--muted);transition:all .15s;}
           <button id="addMealToLib">Add</button>
         </div>
       </div>
-      <div class="meal-emoji-row" id="emojiRow" style="display:none;">
-        <!-- populated by JS -->
+      <div class="meal-emoji-row" id="emojiRow" style="display:none;"></div>
+
+      <div class="meal-section-label" style="margin-top:14px;">SIDES — TAP TO ADD / REMOVE</div>
+      <div class="meal-list" id="sidePickerList"></div>
+      <div class="meal-section-label">ADD NEW SIDE</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span id="selectedSideEmoji" style="font-size:1.4rem;cursor:pointer;" title="Pick emoji">🥗</span>
+        <div class="meal-add-new" style="flex:1;">
+          <input type="text" id="newSideName" placeholder="e.g. Caesar Salad">
+          <button id="addSideToLib">Add</button>
+        </div>
       </div>
+      <div class="meal-emoji-row" id="sideEmojiRow" style="display:none;"></div>
     </div>
   </div>
 </div>
@@ -473,8 +506,9 @@ let viewMonth = today.getMonth();
 let viewDay   = today.getDate();
 let viewMode  = localStorage.getItem('fam-view-mode') || 'month'; // 'week' | 'month' | 'quarter'
 let events    = {}; // "Y-M-D" → [{id,title,person,time,icon,location,uid,fromICS}]
-let meals     = {}; // "Y-M-D" → {id, mealId, name, icon}   (one dinner per day)
+let meals     = {}; // "Y-M-D" → {id, mealId, name, icon, sides:[{id,name,icon}]}
 let mealLib   = []; // [{id, name, icon, timesUsed, lastUsed}]
+let sideLib   = []; // [{id, name, icon, timesUsed, lastUsed}] (localStorage only)
 
 // ═══════════════════════════════════════════════
 // SUPABASE — EVENTS
@@ -527,21 +561,28 @@ async function loadMeals() {
     const { data, error } = await db.from('meals').select('*').eq('calendar_id', CALENDAR_ID);
     if (error) throw error;
     meals = {};
-    for (const r of data) meals[r.event_key] = { id:r.id, mealId:r.meal_lib_id, name:r.name, icon:r.icon };
+    for (const r of data) meals[r.event_key] = { id:r.id, mealId:r.meal_lib_id,
+      name:r.name, icon:r.icon, sides:[] };
     lsSet('fam-meals-v6', meals);
   } catch(e) {
     console.warn('Meals load failed, using cache:', e.message);
     meals = lsGet('fam-meals-v6') || {};
   }
+  // Migration: ensure sides array exists on every entry
+  for (const k of Object.keys(meals)) if (!meals[k].sides) meals[k].sides = [];
 }
 
 async function assignMeal(key, libItem) {
-  // Remove existing
+  // If replacing an existing main meal, decrement its usage
+  if (meals[key] && meals[key].mealId) {
+    await decrementMealUsage(meals[key].mealId);
+  }
+  // Preserve any existing sides when changing the main
+  const existingSides = (meals[key] && meals[key].sides) || [];
   if (meals[key]) {
     try { await db.from('meals').delete().eq('id', meals[key].id); } catch(e){}
   }
-  const entry = { name:libItem.name, icon:libItem.icon, mealId:libItem.id };
-  meals[key] = entry;
+  meals[key] = { name:libItem.name, icon:libItem.icon, mealId:libItem.id, sides:existingSides };
   try {
     const { data, error } = await db.from('meals').insert({
       calendar_id:CALENDAR_ID, event_key:key,
@@ -550,15 +591,36 @@ async function assignMeal(key, libItem) {
     if (error) throw error;
     meals[key].id = data.id;
   } catch(e) { console.warn('Assign meal failed:', e.message); }
-  // Update usage stats in library
   await updateMealUsage(libItem.id);
   lsSet('fam-meals-v6', meals);
 }
 
 async function removeMeal(key) {
   if (!meals[key]) return;
+  // Decrement counts for the main and every side that was on this day
+  if (meals[key].mealId) await decrementMealUsage(meals[key].mealId);
+  if (meals[key].sides) for (const s of meals[key].sides) decrementSideUsage(s.id);
   try { await db.from('meals').delete().eq('id', meals[key].id); } catch(e){}
   delete meals[key];
+  lsSet('fam-meals-v6', meals);
+}
+
+async function addSideToDay(key, sideItem) {
+  if (!meals[key]) meals[key] = { sides:[] };
+  if (!meals[key].sides) meals[key].sides = [];
+  if (meals[key].sides.some(s => s.id === sideItem.id)) return; // no duplicates
+  meals[key].sides.push({ id:sideItem.id, name:sideItem.name, icon:sideItem.icon });
+  incrementSideUsage(sideItem.id);
+  lsSet('fam-meals-v6', meals);
+}
+
+async function removeSideFromDay(key, sideId) {
+  if (!meals[key] || !meals[key].sides) return;
+  const before = meals[key].sides.length;
+  meals[key].sides = meals[key].sides.filter(s => s.id !== sideId);
+  if (meals[key].sides.length < before) decrementSideUsage(sideId);
+  // If a sides-only record now has nothing, drop it
+  if (!meals[key].mealId && !meals[key].sides.length) delete meals[key];
   lsSet('fam-meals-v6', meals);
 }
 
@@ -606,6 +668,59 @@ async function updateMealUsage(id) {
     await db.from('meal_library').update({ times_used:item.timesUsed, last_used:item.lastUsed }).eq('id', id);
   } catch(e){}
   lsSet('fam-meallib-v6', mealLib);
+}
+
+async function decrementMealUsage(id) {
+  const item = mealLib.find(m=>m.id===id);
+  if (!item) return;
+  item.timesUsed = Math.max(0, (item.timesUsed||0) - 1);
+  try {
+    await db.from('meal_library').update({ times_used:item.timesUsed }).eq('id', id);
+  } catch(e){}
+  lsSet('fam-meallib-v6', mealLib);
+}
+
+// ═══════════════════════════════════════════════
+// SIDES LIBRARY (localStorage-only for now)
+// ═══════════════════════════════════════════════
+function loadSideLib() {
+  sideLib = lsGet('fam-sidelib-v1') || defaultSideLib();
+}
+function addToSideLib(name, icon) {
+  const item = { id:'side-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
+    name, icon:icon||'🥗', timesUsed:0, lastUsed:null };
+  sideLib.push(item);
+  lsSet('fam-sidelib-v1', sideLib);
+  return item;
+}
+function deleteSideFromLib(id) {
+  sideLib = sideLib.filter(s=>s.id!==id);
+  lsSet('fam-sidelib-v1', sideLib);
+}
+function incrementSideUsage(id) {
+  const item = sideLib.find(s=>s.id===id);
+  if (!item) return;
+  item.timesUsed = (item.timesUsed||0) + 1;
+  item.lastUsed = new Date().toISOString().slice(0,10);
+  lsSet('fam-sidelib-v1', sideLib);
+}
+function decrementSideUsage(id) {
+  const item = sideLib.find(s=>s.id===id);
+  if (!item) return;
+  item.timesUsed = Math.max(0, (item.timesUsed||0) - 1);
+  lsSet('fam-sidelib-v1', sideLib);
+}
+function defaultSideLib() {
+  return [
+    {id:'sd1',name:'Garden Salad',    icon:'🥗',timesUsed:0,lastUsed:null},
+    {id:'sd2',name:'Bread',           icon:'🥖',timesUsed:0,lastUsed:null},
+    {id:'sd3',name:'Rice',            icon:'🍚',timesUsed:0,lastUsed:null},
+    {id:'sd4',name:'Roasted Veggies', icon:'🥦',timesUsed:0,lastUsed:null},
+    {id:'sd5',name:'Mashed Potatoes', icon:'🥔',timesUsed:0,lastUsed:null},
+    {id:'sd6',name:'Corn',            icon:'🌽',timesUsed:0,lastUsed:null},
+    {id:'sd7',name:'Fries',           icon:'🍟',timesUsed:0,lastUsed:null},
+    {id:'sd8',name:'Fruit',           icon:'🍎',timesUsed:0,lastUsed:null},
+  ];
 }
 
 function defaultMealLib() {
@@ -836,10 +951,14 @@ function buildMealCell(year,month,day,isCur){
   const meal=meals[key];
   const cell=document.createElement('div');
   cell.className='meal-strip-cell'+(isCur?'':' other-month-meal');
-  if(meal){
-    cell.innerHTML=`
-      <span class="meal-icon">${meal.icon||'🍽️'}</span>
-      <span class="meal-name">${meal.name}</span>
+  const hasMain=meal&&meal.name;
+  const hasSides=meal&&meal.sides&&meal.sides.length;
+  if(hasMain||hasSides){
+    const sidesStr=hasSides?meal.sides.map(s=>s.icon||'🥗').join(''):'';
+    const mainPart=hasMain
+      ?`<span class="meal-icon">${meal.icon||'🍽️'}</span><span class="meal-name">${meal.name}${sidesStr?' · '+sidesStr:''}</span>`
+      :`<span class="meal-icon">🥗</span><span class="meal-name">${sidesStr}</span>`;
+    cell.innerHTML=`${mainPart}
       <button class="meal-del" title="Remove meal" onclick="event.stopPropagation();removeMealFromStrip('${key}')">✕</button>`;
   }else{
     cell.innerHTML=`<span class="meal-empty">+ dinner</span>`;
@@ -1038,31 +1157,82 @@ async function deleteAndRefresh(key,id,uid){
 // MEAL PICKER (in side panel)
 // ═══════════════════════════════════════════════
 const MEAL_EMOJIS=['🍽️','🌮','🍝','🍗','🍕','🍔','🥢','🧀','🥣','🔥','🐟','🥞','🫓','🍜','🥗','🍣','🥩','🍲','🌯','🥙'];
+const SIDE_EMOJIS=['🥗','🥖','🍚','🥦','🥔','🌽','🍟','🍎','🍞','🥒','🥕','🍅','🥑','🫘','🍇','🍓','🍌','🥬','🧅','🍐'];
 let pickerSelectedEmoji='🍽️';
+let sidePickerSelectedEmoji='🥗';
+
+function panelKey(){
+  const p=document.getElementById('sidePanel');
+  return `${p.dataset.y}-${p.dataset.m}-${p.dataset.d}`;
+}
 
 function renderMealPicker(y,m,d){
+  const dateStr=new Date(y,m,d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   const key=`${y}-${m}-${d}`;
   const assigned=meals[key];
+  const has=assigned&&(assigned.name||(assigned.sides&&assigned.sides.length));
   document.getElementById('mealPickerTitle').textContent=
-    assigned?`🍽️ Change dinner — ${new Date(y,m,d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}`
-            :`🍽️ Pick dinner — ${new Date(y,m,d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}`;
-  renderMealPickerList('');
+    has?`🍽️ ${dateStr}`:`🍽️ Pick dinner — ${dateStr}`;
+  renderCurrentSelection();
+  renderMealPickerList(document.getElementById('mealSearch').value||'');
+  renderSidePickerList();
+}
+
+function renderCurrentSelection(){
+  const el=document.getElementById('currentSelection');
+  const key=panelKey();
+  const m=meals[key];
+  el.classList.remove('empty');
+  el.innerHTML='';
+  const hasMain=m&&m.name;
+  const hasSides=m&&m.sides&&m.sides.length;
+  if(!hasMain&&!hasSides){
+    el.classList.add('empty');
+    el.innerHTML='<div class="current-empty">Nothing picked yet — tap a main below.</div>';
+    return;
+  }
+  if(hasMain){
+    const main=document.createElement('div');
+    main.className='current-main';
+    main.innerHTML=`<span class="cm-icon">${m.icon||'🍽️'}</span><span class="cm-name">${m.name}</span>`;
+    el.appendChild(main);
+  }
+  if(hasSides){
+    const sidesWrap=document.createElement('div');
+    sidesWrap.className='current-sides';
+    m.sides.forEach(s=>{
+      const chip=document.createElement('span');
+      chip.className='side-chip';
+      chip.innerHTML=`${s.icon||'🥗'} ${s.name} <button title="Remove side">✕</button>`;
+      chip.querySelector('button').addEventListener('click',async()=>{
+        await removeSideFromDay(key,s.id);
+        renderCalendar();
+        renderMealPicker(+document.getElementById('sidePanel').dataset.y,
+                         +document.getElementById('sidePanel').dataset.m,
+                         +document.getElementById('sidePanel').dataset.d);
+      });
+      sidesWrap.appendChild(chip);
+    });
+    el.appendChild(sidesWrap);
+  }
 }
 
 function renderMealPickerList(query){
   const list=document.getElementById('mealPickerList');
   list.innerHTML='';
+  const key=panelKey();
+  const currentMainId=meals[key]&&meals[key].mealId;
   const filtered=query
     ?mealLib.filter(m=>m.name.toLowerCase().includes(query.toLowerCase()))
     :[...mealLib].sort((a,b)=>(b.timesUsed||0)-(a.timesUsed||0));
-
   if(!filtered.length){
     list.innerHTML='<div style="color:var(--muted);font-size:.84rem;padding:8px 0;">No meals found. Add one below!</div>';
     return;
   }
   filtered.forEach(item=>{
     const el=document.createElement('div');
-    el.className='meal-list-item';
+    const isActive=item.id===currentMainId;
+    el.className='meal-list-item'+(isActive?' active':'');
     const lastUsed=item.lastUsed?`Last: ${item.lastUsed}`:'Never made';
     el.innerHTML=`
       <span class="ml-icon">${item.icon}</span>
@@ -1070,12 +1240,47 @@ function renderMealPickerList(query){
         <div class="ml-name">${item.name}</div>
         <div class="ml-meta">${lastUsed}</div>
       </div>
-      <span class="ml-times">${item.timesUsed||0}x</span>`;
+      <span class="ml-times">${item.timesUsed||0}x</span>
+      ${isActive?'<span class="ml-check">✓</span>':''}`;
     el.addEventListener('click',async()=>{
-      const panel=document.getElementById('sidePanel');
-      await assignMeal(`${panel.dataset.y}-${panel.dataset.m}-${panel.dataset.d}`, item);
+      const p=document.getElementById('sidePanel');
+      await assignMeal(panelKey(),item);
       renderCalendar();
-      renderMealPicker(+panel.dataset.y,+panel.dataset.m,+panel.dataset.d);
+      renderMealPicker(+p.dataset.y,+p.dataset.m,+p.dataset.d);
+    });
+    list.appendChild(el);
+  });
+}
+
+function renderSidePickerList(){
+  const list=document.getElementById('sidePickerList');
+  list.innerHTML='';
+  const key=panelKey();
+  const currentSideIds=new Set(((meals[key]&&meals[key].sides)||[]).map(s=>s.id));
+  const sorted=[...sideLib].sort((a,b)=>(b.timesUsed||0)-(a.timesUsed||0));
+  if(!sorted.length){
+    list.innerHTML='<div style="color:var(--muted);font-size:.84rem;padding:8px 0;">No sides yet. Add one below!</div>';
+    return;
+  }
+  sorted.forEach(item=>{
+    const isActive=currentSideIds.has(item.id);
+    const el=document.createElement('div');
+    el.className='meal-list-item'+(isActive?' active':'');
+    const lastUsed=item.lastUsed?`Last: ${item.lastUsed}`:'Never used';
+    el.innerHTML=`
+      <span class="ml-icon">${item.icon}</span>
+      <div class="ml-info">
+        <div class="ml-name">${item.name}</div>
+        <div class="ml-meta">${lastUsed}</div>
+      </div>
+      <span class="ml-times">${item.timesUsed||0}x</span>
+      ${isActive?'<span class="ml-check">✓</span>':''}`;
+    el.addEventListener('click',async()=>{
+      const p=document.getElementById('sidePanel');
+      if(isActive)await removeSideFromDay(panelKey(),item.id);
+      else await addSideToDay(panelKey(),item);
+      renderCalendar();
+      renderMealPicker(+p.dataset.y,+p.dataset.m,+p.dataset.d);
     });
     list.appendChild(el);
   });
@@ -1085,12 +1290,11 @@ document.getElementById('mealSearch').addEventListener('input',e=>{
   renderMealPickerList(e.target.value);
 });
 
-// Emoji picker toggle
+// Emoji picker — main meal
 document.getElementById('selectedEmoji').addEventListener('click',()=>{
   const row=document.getElementById('emojiRow');
   if(row.style.display==='none'){
-    row.style.display='flex';
-    row.innerHTML='';
+    row.style.display='flex';row.innerHTML='';
     MEAL_EMOJIS.forEach(em=>{
       const btn=document.createElement('button');
       btn.className='meal-emoji-btn'+(em===pickerSelectedEmoji?' selected':'');
@@ -1108,10 +1312,38 @@ document.getElementById('selectedEmoji').addEventListener('click',()=>{
 document.getElementById('addMealToLib').addEventListener('click',async()=>{
   const name=document.getElementById('newMealName').value.trim();
   if(!name)return;
-  const item=await addToMealLib(name,pickerSelectedEmoji);
+  await addToMealLib(name,pickerSelectedEmoji);
   document.getElementById('newMealName').value='';
   document.getElementById('emojiRow').style.display='none';
   renderMealPickerList(document.getElementById('mealSearch').value);
+});
+
+// Emoji picker — side
+document.getElementById('selectedSideEmoji').addEventListener('click',()=>{
+  const row=document.getElementById('sideEmojiRow');
+  if(row.style.display==='none'){
+    row.style.display='flex';row.innerHTML='';
+    SIDE_EMOJIS.forEach(em=>{
+      const btn=document.createElement('button');
+      btn.className='meal-emoji-btn'+(em===sidePickerSelectedEmoji?' selected':'');
+      btn.textContent=em;
+      btn.addEventListener('click',()=>{
+        sidePickerSelectedEmoji=em;
+        document.getElementById('selectedSideEmoji').textContent=em;
+        row.querySelectorAll('.meal-emoji-btn').forEach(b=>b.classList.toggle('selected',b.textContent===em));
+      });
+      row.appendChild(btn);
+    });
+  }else{row.style.display='none';}
+});
+
+document.getElementById('addSideToLib').addEventListener('click',()=>{
+  const name=document.getElementById('newSideName').value.trim();
+  if(!name)return;
+  addToSideLib(name,sidePickerSelectedEmoji);
+  document.getElementById('newSideName').value='';
+  document.getElementById('sideEmojiRow').style.display='none';
+  renderSidePickerList();
 });
 
 // ═══════════════════════════════════════════════
@@ -1319,6 +1551,7 @@ document.querySelectorAll('.view-mode-btn').forEach(btn=>{
 // BOOT
 // ═══════════════════════════════════════════════
 async function init(){
+  loadSideLib();
   await Promise.all([loadEvents(), loadMeals(), loadMealLib()]);
   await cleanupSeedData();
   if(Object.keys(events).length===0){
