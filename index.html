@@ -668,6 +668,7 @@ async function loadEvents() {
     let preserved = 0;
     for (const [k, list] of Object.entries(cached)) {
       for (const ev of list) {
+        if (ev.fromICS) continue; // ICS events are authoritative from syncICS — never restore from cache
         if (ev.id && !dbIds.has(String(ev.id))) {
           if (!events[k]) events[k] = [];
           events[k].push(ev);
@@ -675,7 +676,7 @@ async function loadEvents() {
         }
       }
     }
-    if (preserved) console.warn(`⚠️ ${preserved} cached event(s) not in DB — preserved as local. Run pushLocalToSupabase() to migrate.`);
+    if (preserved) console.warn(`⚠️ ${preserved} cached personal event(s) not in DB — preserved as local. Run pushLocalToSupabase() to migrate.`);
     lsSet('fam-events-v6', events);
   } catch(e) {
     console.warn('Events load failed, using cache:', e.message);
@@ -1123,6 +1124,41 @@ document.getElementById('syncBtn').addEventListener('click',syncICS);
 // calendar_id schema, to push events / meal library / day-meal records
 // that were previously saved only to localStorage.
 // ═══════════════════════════════════════════════
+// Remove duplicate items from meal_library and side_library by name (case-insensitive).
+// Keeps the entry with the highest times_used; deletes the rest from Supabase.
+async function dedupeLibraries(){
+  console.log('🔍 Scanning libraries for duplicates…');
+  let mealRemoved=0, sideRemoved=0;
+  const dedupe = async (lib, table) => {
+    const groups = new Map();
+    for (const item of lib) {
+      const k = (item.name||'').trim().toLowerCase();
+      if (!k) continue;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(item);
+    }
+    let removed = 0;
+    for (const items of groups.values()) {
+      if (items.length < 2) continue;
+      items.sort((a,b)=>(b.timesUsed||0)-(a.timesUsed||0));
+      for (let i=1; i<items.length; i++) {
+        const drop = items[i];
+        try {
+          if (isDbId(drop.id)) await db.from(table).delete().eq('id', drop.id);
+          removed++;
+        } catch(e) { console.warn(`Failed to delete duplicate "${drop.name}":`, e.message); }
+      }
+    }
+    return removed;
+  };
+  mealRemoved = await dedupe(mealLib, 'meal_library');
+  sideRemoved = await dedupe(sideLib, 'side_library');
+  await Promise.all([loadMealLib(), loadSideLib()]);
+  renderCalendar();
+  console.log(`✅ Removed ${mealRemoved} duplicate meal(s), ${sideRemoved} duplicate side(s).`);
+  return {mealRemoved, sideRemoved};
+}
+
 function isDbId(id){
   if (id == null) return false;
   if (typeof id === 'number') return true;
