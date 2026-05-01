@@ -778,6 +778,43 @@ async function removeSideFromDay(key, sideId) {
 // ═══════════════════════════════════════════════
 // SUPABASE — MEAL LIBRARY
 // ═══════════════════════════════════════════════
+function backfillIconsFromName() {
+  if (lsGet('fam-icon-backfill-v1')) return;
+  let libChanged = 0, sideChanged = 0, mealChanged = 0;
+
+  for (const item of mealLib) {
+    if (item.icon === '🍽️') {
+      const guess = guessEmoji(item.name, '🍽️');
+      if (guess !== '🍽️') { item.icon = guess; libChanged++; }
+    }
+  }
+  for (const item of sideLib) {
+    if (item.icon === '🥗' || item.icon === '🥣') {
+      const guess = guessEmoji(item.name, '🥣');
+      if (guess !== '🥗' && guess !== '🥣') { item.icon = guess; sideChanged++; }
+    }
+  }
+  for (const k of Object.keys(meals)) {
+    const m = meals[k];
+    if (m.name && m.icon === '🍽️') {
+      const guess = guessEmoji(m.name, '🍽️');
+      if (guess !== '🍽️') { m.icon = guess; mealChanged++; }
+    }
+    if (m.sides) for (const s of m.sides) {
+      if (s.icon === '🥗' || s.icon === '🥣') {
+        const guess = guessEmoji(s.name, '🥣');
+        if (guess !== '🥗' && guess !== '🥣') { s.icon = guess; mealChanged++; }
+      }
+    }
+  }
+  if (libChanged)  lsSet('fam-meallib-v6', mealLib);
+  if (sideChanged) lsSet('fam-sidelib-v1', sideLib);
+  if (mealChanged) lsSet('fam-meals-v6',  meals);
+  lsSet('fam-icon-backfill-v1', true);
+  if (libChanged + sideChanged + mealChanged > 0)
+    console.log(`✨ Auto-iconized ${libChanged} meal(s), ${sideChanged} side(s), ${mealChanged} day record(s).`);
+}
+
 async function loadMealLib() {
   try {
     const { data, error } = await db.from('meal_library').select('*').eq('calendar_id', CALENDAR_ID).order('times_used', {ascending:false});
@@ -2109,6 +2146,7 @@ document.querySelectorAll('.view-mode-btn').forEach(btn=>{
 async function init(){
   loadSideLib();
   await Promise.all([loadEvents(), loadMeals(), loadMealLib()]);
+  backfillIconsFromName();
   await cleanupSeedData();
   if(Object.keys(events).length===0){
     await syncICS();
