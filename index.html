@@ -651,6 +651,7 @@ function eventVisible(ev){
 // SUPABASE — EVENTS
 // ═══════════════════════════════════════════════
 async function loadEvents() {
+  const cached = lsGet('fam-events-v6') || {};
   try {
     const { data, error } = await db.from('events').select('*').eq('calendar_id', CALENDAR_ID);
     if (error) throw error;
@@ -660,10 +661,25 @@ async function loadEvents() {
       events[r.event_key].push({ id:r.id, title:r.title, person:r.person,
         time:r.time, icon:r.icon, location:r.location||'', uid:r.uid||'', fromICS:r.from_ics });
     }
+    // Safety net: any cached event whose id isn't in the DB result was a local-only
+    // save (failed DB insert). Preserve it instead of wiping it from the cache.
+    const dbIds = new Set();
+    for (const list of Object.values(events)) for (const ev of list) dbIds.add(String(ev.id));
+    let preserved = 0;
+    for (const [k, list] of Object.entries(cached)) {
+      for (const ev of list) {
+        if (ev.id && !dbIds.has(String(ev.id))) {
+          if (!events[k]) events[k] = [];
+          events[k].push(ev);
+          preserved++;
+        }
+      }
+    }
+    if (preserved) console.warn(`⚠️ ${preserved} cached event(s) not in DB — preserved as local. Run pushLocalToSupabase() to migrate.`);
     lsSet('fam-events-v6', events);
   } catch(e) {
     console.warn('Events load failed, using cache:', e.message);
-    events = lsGet('fam-events-v6') || {};
+    events = cached;
   }
   // Migration: backfill missing ids and persons arrays, swap Alice's old bow icon for mermaid
   let migrated = 0;
@@ -716,6 +732,14 @@ async function loadMeals() {
     for (const r of data) meals[r.event_key] = { id:r.id, mealId:r.meal_lib_id,
       name:r.name, icon:r.icon,
       sides:(cached[r.event_key] && cached[r.event_key].sides) || [] };
+    // Preserve cached meals not present in DB (local-only saves)
+    let preserved = 0;
+    for (const [k, m] of Object.entries(cached)) {
+      if (!meals[k] && (m.name || (m.sides && m.sides.length))) {
+        meals[k] = m; preserved++;
+      }
+    }
+    if (preserved) console.warn(`⚠️ ${preserved} cached meal(s) not in DB — preserved as local.`);
     lsSet('fam-meals-v6', meals);
   } catch(e) {
     console.warn('Meals load failed, using cache:', e.message);
@@ -817,14 +841,23 @@ function backfillIconsFromName() {
 }
 
 async function loadMealLib() {
+  const cached = lsGet('fam-meallib-v6') || [];
   try {
     const { data, error } = await db.from('meal_library').select('*').eq('calendar_id', CALENDAR_ID).order('times_used', {ascending:false});
     if (error) throw error;
     mealLib = data.map(r=>({ id:r.id, name:r.name, icon:r.icon||'🍽️', timesUsed:r.times_used||0, lastUsed:r.last_used }));
+    // Preserve cached library items whose id isn't in the DB (local-only adds)
+    const dbIds = new Set(mealLib.map(m => String(m.id)));
+    let preserved = 0;
+    for (const item of cached) {
+      if (item.id && !dbIds.has(String(item.id))) { mealLib.push(item); preserved++; }
+    }
+    if (preserved) console.warn(`⚠️ ${preserved} cached meal lib item(s) not in DB — preserved as local.`);
+    if (!mealLib.length) mealLib = defaultMealLib();
     lsSet('fam-meallib-v6', mealLib);
   } catch(e) {
     console.warn('Meal lib load failed, using cache:', e.message);
-    mealLib = lsGet('fam-meallib-v6') || defaultMealLib();
+    mealLib = cached.length ? cached : defaultMealLib();
   }
 }
 
@@ -1040,7 +1073,15 @@ document.getElementById('syncBtn').addEventListener('click',syncICS);
 // calendar_id schema, to push events / meal library / day-meal records
 // that were previously saved only to localStorage.
 // ═══════════════════════════════════════════════
-function isDbId(id){return typeof id==='number'||(typeof id==='string'&&/^\d+$/.test(id));}
+function isDbId(id){
+  if (id == null) return false;
+  if (typeof id === 'number') return true;
+  const s = String(id);
+  if (s.startsWith('local-')) return false;
+  if (/^d\d+$/.test(s) || /^sd\d+$/.test(s)) return false; // default seed ids
+  // Numeric string OR UUID format (Supabase default for new tables)
+  return /^\d+$/.test(s) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+}
 
 async function pushLocalToSupabase(){
   console.log('📤 Pushing local-only data to Supabase…');
