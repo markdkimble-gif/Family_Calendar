@@ -460,6 +460,9 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
       <label>➕ Add Event</label>
       <input type="text" id="newTitle" placeholder="What's happening?">
       <input type="time" id="newTime" value="09:00">
+      <label class="multi-day-toggle" id="allDayWrap">
+        <input type="checkbox" id="allDayChk"> All-day event (e.g. birthday)
+      </label>
       <label class="multi-day-toggle">
         <input type="checkbox" id="multiDayChk"> Multi-day event (e.g. work trip)
       </label>
@@ -571,7 +574,10 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
         <div id="editSingleFields">
           <label>Date</label>
           <input type="date" id="editDate">
-          <label>Time</label>
+          <label class="multi-day-toggle">
+            <input type="checkbox" id="editAllDayChk"> All-day event (e.g. birthday)
+          </label>
+          <label id="editTimeLabel">Time</label>
           <input type="time" id="editTime">
         </div>
         <div id="editMultiFields" style="display:none;">
@@ -1794,7 +1800,12 @@ document.getElementById('libAddBtn').addEventListener('click',async()=>{
 document.getElementById('multiDayChk').addEventListener('change',e=>{
   const on=e.target.checked;
   document.getElementById('multiDayFields').style.display=on?'':'none';
-  document.getElementById('newTime').style.display=on?'none':'';
+  document.getElementById('newTime').style.display=on?'none':(document.getElementById('allDayChk').checked?'none':'');
+  document.getElementById('allDayWrap').style.display=on?'none':'';
+});
+
+document.getElementById('allDayChk').addEventListener('change',e=>{
+  document.getElementById('newTime').style.display=e.target.checked?'none':'';
 });
 
 document.getElementById('addEventBtn').addEventListener('click',async()=>{
@@ -1824,12 +1835,16 @@ document.getElementById('addEventBtn').addEventListener('click',async()=>{
       cur.setDate(cur.getDate()+1);
     }
   }else{
-    await addEv(y,m,d,{title,time:fmt12(time),person,persons,icon});
+    const allDay=document.getElementById('allDayChk').checked;
+    const t=allDay?'All Day':fmt12(time);
+    await addEv(y,m,d,{title,time:t,person,persons,icon});
   }
 
   document.getElementById('newTitle').value='';
   document.getElementById('multiDayChk').checked=false;
   document.getElementById('multiDayFields').style.display='none';
+  document.getElementById('allDayChk').checked=false;
+  document.getElementById('allDayWrap').style.display='';
   document.getElementById('newTime').style.display='';
   setSelectedPersons('newPersonPills',[]);
   renderCalendar();
@@ -1873,6 +1888,10 @@ function openEditEvent(key,id){
   document.getElementById('editStartDate').value=isoDate(sy,sm,sd);
   document.getElementById('editEndDate').value=isoDate(ey,em,ed);
   document.getElementById('editTime').value=parse12to24(ev.time)||'09:00';
+  const isAllDay=ev.time==='All Day'&&!(isMulti&&group.length>1);
+  document.getElementById('editAllDayChk').checked=isAllDay;
+  document.getElementById('editTime').style.display=isAllDay?'none':'';
+  document.getElementById('editTimeLabel').style.display=isAllDay?'none':'';
 
   toggleEditFields(isMulti&&group.length>1);
   document.getElementById('editEventModal').classList.add('open');
@@ -1885,6 +1904,11 @@ function toggleEditFields(isMulti){
 
 document.getElementById('editMultiChk').addEventListener('change',e=>{
   toggleEditFields(e.target.checked);
+});
+document.getElementById('editAllDayChk').addEventListener('change',e=>{
+  const on=e.target.checked;
+  document.getElementById('editTime').style.display=on?'none':'';
+  document.getElementById('editTimeLabel').style.display=on?'none':'';
 });
 document.getElementById('closeEditModal').addEventListener('click',()=>{
   document.getElementById('editEventModal').classList.remove('open');
@@ -1930,8 +1954,10 @@ document.getElementById('editSaveBtn').addEventListener('click',async()=>{
     const dateStr=document.getElementById('editDate').value;
     if(!dateStr){alert('Pick a date.');return;}
     const[y,m,d]=dateStr.split('-').map(Number);
+    const allDay=document.getElementById('editAllDayChk').checked;
     const time=document.getElementById('editTime').value;
-    await addEv(y,m-1,d,{title,time:fmt12(time),person,persons,icon});
+    const t=allDay?'All Day':fmt12(time);
+    await addEv(y,m-1,d,{title,time:t,person,persons,icon});
   }
 
   document.getElementById('editEventModal').classList.remove('open');
