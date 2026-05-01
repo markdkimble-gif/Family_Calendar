@@ -708,18 +708,19 @@ async function clearICSFromDB() {
 // SUPABASE — MEALS (daily assignments)
 // ═══════════════════════════════════════════════
 async function loadMeals() {
+  const cached = lsGet('fam-meals-v6') || {};
   try {
     const { data, error } = await db.from('meals').select('*').eq('calendar_id', CALENDAR_ID);
     if (error) throw error;
     meals = {};
     for (const r of data) meals[r.event_key] = { id:r.id, mealId:r.meal_lib_id,
-      name:r.name, icon:r.icon, sides:[] };
+      name:r.name, icon:r.icon,
+      sides:(cached[r.event_key] && cached[r.event_key].sides) || [] };
     lsSet('fam-meals-v6', meals);
   } catch(e) {
     console.warn('Meals load failed, using cache:', e.message);
-    meals = lsGet('fam-meals-v6') || {};
+    meals = cached;
   }
-  // Migration: ensure sides array exists on every entry
   for (const k of Object.keys(meals)) if (!meals[k].sides) meals[k].sides = [];
 }
 
@@ -1032,6 +1033,82 @@ async function syncICS() {
   btn.classList.remove('syncing'); btn.textContent='⚽ Sync Soccer';
 }
 document.getElementById('syncBtn').addEventListener('click',syncICS);
+
+// ═══════════════════════════════════════════════
+// MIGRATE LOCAL-ONLY DATA → SUPABASE
+// Run pushLocalToSupabase() from the browser console after fixing the
+// calendar_id schema, to push events / meal library / day-meal records
+// that were previously saved only to localStorage.
+// ═══════════════════════════════════════════════
+function isDbId(id){return typeof id==='number'||(typeof id==='string'&&/^\d+$/.test(id));}
+
+async function pushLocalToSupabase(){
+  console.log('📤 Pushing local-only data to Supabase…');
+
+  // 1) Push meal library items (covers default seeds 'd1'-'d15' AND user adds with 'local-' ids)
+  const libIdMap={}; // old library id → new DB id
+  let libPushed=0,libFailed=0;
+  for(const item of mealLib){
+    if(isDbId(item.id))continue;
+    try{
+      const{data,error}=await db.from('meal_library').insert({
+        calendar_id:CALENDAR_ID,name:item.name,icon:item.icon||'🍽️',
+        times_used:item.timesUsed||0,last_used:item.lastUsed
+      }).select().single();
+      if(error)throw error;
+      libIdMap[item.id]=data.id;
+      item.id=data.id;
+      libPushed++;
+    }catch(e){console.warn(`mealLib "${item.name}" failed:`,e.message);libFailed++;}
+  }
+
+  // 2) Push day-meal records (translate old library ids to new)
+  let mealsPushed=0,mealsFailed=0;
+  for(const[key,m]of Object.entries(meals)){
+    if(isDbId(m.id))continue;
+    if(!m.name)continue; // skip sides-only records (no DB representation yet)
+    const dbMealId=libIdMap[m.mealId]||(isDbId(m.mealId)?m.mealId:null);
+    try{
+      const{data,error}=await db.from('meals').insert({
+        calendar_id:CALENDAR_ID,event_key:key,
+        meal_lib_id:dbMealId,name:m.name,icon:m.icon
+      }).select().single();
+      if(error)throw error;
+      m.id=data.id;
+      if(dbMealId)m.mealId=dbMealId;
+      mealsPushed++;
+    }catch(e){console.warn(`meal "${m.name}" on ${key} failed:`,e.message);mealsFailed++;}
+  }
+
+  // 3) Push events (the main thing the user is worried about)
+  let evPushed=0,evFailed=0;
+  for(const[key,list]of Object.entries(events)){
+    for(const ev of list){
+      if(isDbId(ev.id))continue;
+      try{
+        const{data,error}=await db.from('events').insert({
+          calendar_id:CALENDAR_ID,event_key:key,title:ev.title,person:ev.person,
+          time:ev.time||'',icon:ev.icon||'',location:ev.location||'',
+          uid:ev.uid||'',from_ics:ev.fromICS||false
+        }).select().single();
+        if(error)throw error;
+        ev.id=data.id;
+        evPushed++;
+      }catch(e){console.warn(`event "${ev.title}" on ${key} failed:`,e.message);evFailed++;}
+    }
+  }
+
+  lsSet('fam-events-v6',events);
+  lsSet('fam-meals-v6',meals);
+  lsSet('fam-meallib-v6',mealLib);
+
+  console.log(`✅ Pushed: ${evPushed} event(s), ${libPushed} meal lib item(s), ${mealsPushed} day meal(s).`);
+  if(evFailed||libFailed||mealsFailed){
+    console.warn(`⚠️  Failures: ${evFailed} events, ${libFailed} mealLib, ${mealsFailed} meals. See warnings above.`);
+  }
+  console.log('Hard-refresh to confirm everything loads from Supabase.');
+  return{evPushed,libPushed,mealsPushed,evFailed,libFailed,mealsFailed};
+}
 
 // ═══════════════════════════════════════════════
 // ADD / SEED EVENTS
