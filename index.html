@@ -1096,9 +1096,21 @@ async function syncICS() {
   try {
     await clearICSFromDB();
     let total=0;
+    const perFeed=[];
     for(const feed of ICS_FEEDS){
-      const res=await fetch(PROXY+encodeURIComponent(feed.url));
-      total+=ingestFeed(parseICS(await res.text()), feed);
+      try {
+        const res=await fetch(PROXY+encodeURIComponent(feed.url));
+        if(!res.ok)throw new Error(`HTTP ${res.status}`);
+        const text=await res.text();
+        if(!text.includes('BEGIN:VEVENT'))throw new Error('feed has no VEVENTs (likely expired URL)');
+        const count=ingestFeed(parseICS(text), feed);
+        perFeed.push(`${feed.person}: ${count}`);
+        total+=count;
+        console.log(`✅ ${feed.person} feed: ${count} events`);
+      } catch(feedErr) {
+        perFeed.push(`${feed.person}: FAILED (${feedErr.message})`);
+        console.warn(`❌ ${feed.person} feed failed:`, feedErr.message);
+      }
     }
     const rows=[];
     for(const[key,evList]of Object.entries(events))
@@ -1108,8 +1120,8 @@ async function syncICS() {
     if(rows.length)await db.from('events').insert(rows);
     lsSet('fam-events-v6',events);
     renderCalendar(); renderReminders();
-    msg.textContent=`✅ Synced ${total} events — Charlotte & Alice!`;
-    setTimeout(()=>bar.classList.add('hidden'),4000);
+    msg.textContent=`✅ Synced ${total} events (${perFeed.join(', ')})`;
+    setTimeout(()=>bar.classList.add('hidden'),6000);
   } catch(e){
     msg.textContent='⚠️ Sync failed — check connection.'; console.error(e);
     setTimeout(()=>bar.classList.add('hidden'),5000);
