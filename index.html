@@ -665,12 +665,15 @@ async function loadEvents() {
     console.warn('Events load failed, using cache:', e.message);
     events = lsGet('fam-events-v6') || {};
   }
-  // Migration: backfill missing ids and persons arrays
+  // Migration: backfill missing ids and persons arrays, swap Alice's old bow icon for mermaid
   let migrated = 0;
   for (const k of Object.keys(events)) {
     for (const ev of events[k]) {
       if (!ev.id) { ev.id = 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2,6); migrated++; }
       if (!ev.persons) { ev.persons = ev.person ? [ev.person] : []; migrated++; }
+      if (ev.icon && ev.icon.includes('🎀') && (ev.persons||[]).includes('alice') && !ev.fromICS) {
+        ev.icon = ev.icon.replace(/🎀/g, '🧜‍♀️'); migrated++;
+      }
     }
   }
   if (migrated) lsSet('fam-events-v6', events);
@@ -1037,7 +1040,7 @@ function renderReminders(){
   const area=document.getElementById('reminderArea');
   const key=`${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
   area.innerHTML='';
-  for(const[person,emoji,cls]of[['charlotte','🔔','charlotte-banner'],['alice','🎀','alice-banner']]){
+  for(const[person,emoji,cls]of[['charlotte','🔔','charlotte-banner'],['alice','🧜‍♀️','alice-banner']]){
     if(!activePersonFilter.has(person))continue;
     const mine=(events[key]||[]).filter(e=>e.person===person&&e.fromICS);
     if(!mine.length)continue;
@@ -1058,7 +1061,7 @@ function renderReminders(){
 // ═══════════════════════════════════════════════
 // PERSON PILLS (multi-select)
 // ═══════════════════════════════════════════════
-const PERSON_ICONS={dad:'✈️',mom:'💜',charlotte:'⭐',alice:'🎀',family:'🏠'};
+const PERSON_ICONS={dad:'✈️',mom:'💜',charlotte:'⭐',alice:'🧜‍♀️',family:'🏠'};
 
 function initPersonPills(containerId){
   document.querySelectorAll(`#${containerId} .person-pill`).forEach(el=>{
