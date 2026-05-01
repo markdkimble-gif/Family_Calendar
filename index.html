@@ -1766,8 +1766,9 @@ document.getElementById('addEventBtn').addEventListener('click',async()=>{
   document.getElementById('multiDayChk').checked=false;
   document.getElementById('multiDayFields').style.display='none';
   document.getElementById('newTime').style.display='';
-  renderCalendar();renderPanelBody(y,m,d);
+  renderCalendar();
   if(y===today.getFullYear()&&m===today.getMonth()&&d===today.getDate())renderReminders();
+  closePanel();
 });
 
 // ═══════════════════════════════════════════════
