@@ -121,8 +121,12 @@ margin-top:2px;text-align:center;}
 .cal-multi .event-chip:not(.multi-day-cont):not(.multi-day-start){border-radius:4px;margin:0;}
 .cal-multi .more-chip{font-size:.55rem;color:var(--muted);}
 .cal-multi .meal-strip{display:none;}
-.legend{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-left:auto;}
-.legend-item{display:flex;align-items:center;gap:5px;font-size:.76rem;font-weight:700;}
+.legend{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-left:auto;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:.76rem;font-weight:700;
+padding:4px 8px;border-radius:14px;}
+.legend-item[data-person]{cursor:pointer;transition:opacity .15s,background .15s;user-select:none;}
+.legend-item[data-person]:hover{background:var(--bg);}
+.legend-item.filtered-out{opacity:.32;}
 .legend-dot{width:11px;height:11px;border-radius:50%;}
 
 /* ── STATUS BAR ── */
@@ -413,12 +417,12 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
   <button class="sync-btn" id="syncBtn">⚽ Sync Soccer</button>
   <button class="meal-lib-btn" id="mealLibBtn">🍽️ Meal Library</button>
   <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">🌙</button>
-  <div class="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:var(--dad)"></div>Dad</div>
-    <div class="legend-item"><div class="legend-dot" style="background:var(--mom)"></div>Mom</div>
-    <div class="legend-item"><div class="legend-dot" style="background:var(--charlotte)"></div>Charlotte</div>
-    <div class="legend-item"><div class="legend-dot" style="background:var(--alice)"></div>Alice</div>
-    <div class="legend-item"><div class="legend-dot" style="background:var(--family)"></div>Family</div>
+  <div class="legend" title="Tap a person to filter">
+    <div class="legend-item" data-person="dad"><div class="legend-dot" style="background:var(--dad)"></div>Dad</div>
+    <div class="legend-item" data-person="mom"><div class="legend-dot" style="background:var(--mom)"></div>Mom</div>
+    <div class="legend-item" data-person="charlotte"><div class="legend-dot" style="background:var(--charlotte)"></div>Charlotte</div>
+    <div class="legend-item" data-person="alice"><div class="legend-dot" style="background:var(--alice)"></div>Alice</div>
+    <div class="legend-item" data-person="family"><div class="legend-dot" style="background:var(--family)"></div>Family</div>
     <div class="legend-item"><div class="legend-dot" style="background:var(--meal)"></div>Meals</div>
   </div>
 </header>
@@ -628,6 +632,20 @@ let events    = {}; // "Y-M-D" → [{id,title,person,time,icon,location,uid,from
 let meals     = {}; // "Y-M-D" → {id, mealId, name, icon, sides:[{id,name,icon}]}
 let mealLib   = []; // [{id, name, icon, timesUsed, lastUsed}]
 let sideLib   = []; // [{id, name, icon, timesUsed, lastUsed}] (localStorage only)
+const ALL_PERSONS = ['dad','mom','charlotte','alice','family'];
+let activePersonFilter = (() => {
+  try {
+    const saved = localStorage.getItem('fam-person-filter');
+    if (saved) return new Set(JSON.parse(saved));
+  } catch(e) {}
+  return new Set(ALL_PERSONS);
+})();
+function saveFilter(){ localStorage.setItem('fam-person-filter', JSON.stringify([...activePersonFilter])); }
+function eventVisible(ev){
+  const persons = ev.persons || (ev.person ? [ev.person] : []);
+  if (!persons.length) return true; // events with no person info always show
+  return persons.some(p => activePersonFilter.has(p));
+}
 
 // ═══════════════════════════════════════════════
 // SUPABASE — EVENTS
@@ -1020,6 +1038,7 @@ function renderReminders(){
   const key=`${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
   area.innerHTML='';
   for(const[person,emoji,cls]of[['charlotte','🔔','charlotte-banner'],['alice','🎀','alice-banner']]){
+    if(!activePersonFilter.has(person))continue;
     const mine=(events[key]||[]).filter(e=>e.person===person&&e.fromICS);
     if(!mine.length)continue;
     const name=person[0].toUpperCase()+person.slice(1);
@@ -1083,6 +1102,27 @@ function applyPersonStyle(el,ev){
 initPersonPills('newPersonPills');
 initPersonPills('editPersonPills');
 
+function updateLegendUI(){
+  document.querySelectorAll('.legend-item[data-person]').forEach(el=>{
+    el.classList.toggle('filtered-out', !activePersonFilter.has(el.dataset.person));
+  });
+}
+document.querySelectorAll('.legend-item[data-person]').forEach(el=>{
+  el.addEventListener('click',()=>{
+    const p=el.dataset.person;
+    if(activePersonFilter.has(p))activePersonFilter.delete(p);
+    else activePersonFilter.add(p);
+    if(activePersonFilter.size===0)activePersonFilter=new Set(ALL_PERSONS); // never let it be empty
+    saveFilter();
+    updateLegendUI();
+    renderCalendar();
+    renderReminders();
+    const panel=document.getElementById('sidePanel');
+    if(panel.classList.contains('open'))renderPanelBody(+panel.dataset.y,+panel.dataset.m,+panel.dataset.d);
+  });
+});
+updateLegendUI();
+
 // ═══════════════════════════════════════════════
 // CALENDAR RENDER
 // ═══════════════════════════════════════════════
@@ -1093,7 +1133,7 @@ function buildDayCell(year,month,day,isCur,opts={}){
   const detail=!!opts.detail;
   const isToday=day===today.getDate()&&month===today.getMonth()&&year===today.getFullYear();
   const key=`${year}-${month}-${day}`;
-  const dayEvs=events[key]||[];
+  const dayEvs=(events[key]||[]).filter(eventVisible);
   const cell=document.createElement('div');
   cell.className='cal-cell'+(isCur?'':' other-month')+(isToday?' today':'');
   const numEl=document.createElement('div');
@@ -1310,7 +1350,7 @@ document.querySelectorAll('.panel-tab').forEach(btn=>{
 function renderPanelBody(y,m,d){
   const body=document.getElementById('panelBody');
   const key=`${y}-${m}-${d}`;
-  const evs=events[key]||[];
+  const evs=(events[key]||[]).filter(eventVisible);
   body.innerHTML='';
   if(!evs.length){body.innerHTML='<div class="empty-day">No events — enjoy the free day! 🌤️</div>';return;}
   const cSoccer=evs.filter(e=>e.fromICS&&e.person==='charlotte');
