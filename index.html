@@ -153,6 +153,25 @@ display:flex;align-items:center;gap:11px;animation:slideIn .4s ease;}
 .btn-dismiss{background:rgba(255,255,255,.25);border:none;border-radius:8px;color:#fff;padding:4px 11px;
 font-family:'Nunito',sans-serif;font-weight:700;cursor:pointer;font-size:.8rem;white-space:nowrap;}
 
+/* ── UPCOMING MILESTONES STRIP ── */
+.upcoming-strip{display:flex;gap:8px;margin-bottom:10px;overflow-x:auto;padding:2px 2px 6px;}
+.upcoming-strip:empty{display:none;}
+.upcoming-strip::-webkit-scrollbar{height:4px;}
+.upcoming-strip::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.upcoming-item{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:8px 13px;
+border-radius:14px;background:var(--family-lt);color:var(--family-text);
+font-family:'Nunito',sans-serif;font-weight:800;font-size:.85rem;cursor:pointer;
+border:2px solid transparent;transition:transform .15s,border-color .15s;}
+.upcoming-item:hover{transform:translateY(-1px);border-color:var(--family);}
+.upcoming-item .uc-icon{font-size:1.15rem;}
+.upcoming-item .uc-title{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.upcoming-item .uc-count{font-size:.72rem;font-weight:800;background:rgba(255,255,255,.45);
+padding:2px 9px;border-radius:11px;letter-spacing:.02em;}
+.upcoming-item.today{background:linear-gradient(135deg,var(--dad),#60a5fa);color:#fff;
+animation:pulse 2s ease-in-out infinite;}
+.upcoming-item.today .uc-count{background:rgba(255,255,255,.28);color:#fff;}
+.upcoming-item.soon{background:var(--mom-lt);color:var(--mom-text);}
+
 /* ── CALENDAR GRID ── */
 .day-labels{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-bottom:5px;text-align:center;}
 .day-label{font-weight:800;font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:4px;}
@@ -442,6 +461,7 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
 
 <div class="calendar-wrap">
   <div id="reminderArea"></div>
+  <div id="upcomingStrip" class="upcoming-strip"></div>
   <div class="day-labels top-labels" id="topDayLabels">
     <div class="day-label">Sun</div><div class="day-label">Mon</div>
     <div class="day-label">Tue</div><div class="day-label">Wed</div>
@@ -1631,8 +1651,79 @@ function updateTitle(){
   }
 }
 
+// ═══════════════════════════════════════════════
+// UPCOMING MILESTONES STRIP
+// ═══════════════════════════════════════════════
+// A milestone is a personal (non-ICS) event that's either all-day (birthdays,
+// anniversaries) or part of a multi-day group (trips, vacations).
+function isMilestone(ev){
+  if(ev.fromICS)return false;
+  if(ev.time==='All Day')return true;
+  if(ev.uid&&ev.uid.startsWith('multi-'))return true;
+  return false;
+}
+
+function collectUpcomingMilestones(limit){
+  const now=new Date();now.setHours(0,0,0,0);
+  const items=[];
+  for(const[key,evs]of Object.entries(events)){
+    const parts=key.split('-').map(Number);
+    if(parts.length!==3||parts.some(n=>!Number.isFinite(n)))continue;
+    const[y,m,d]=parts;
+    const target=new Date(y,m,d);target.setHours(0,0,0,0);
+    const days=Math.round((target-now)/(1000*60*60*24));
+    if(days<0)continue;
+    for(const ev of evs){
+      if(!isMilestone(ev))continue;
+      if(!eventVisible(ev))continue;
+      items.push({y,m,d,days,ev});
+    }
+  }
+  items.sort((a,b)=>a.days-b.days);
+  // Dedupe multi-day groups — earliest non-past day wins (kept first after sort).
+  const seenUids=new Set();
+  const deduped=[];
+  for(const it of items){
+    const uid=it.ev.uid;
+    if(uid&&uid.startsWith('multi-')){
+      if(seenUids.has(uid))continue;
+      seenUids.add(uid);
+    }
+    deduped.push(it);
+  }
+  return deduped.slice(0,limit);
+}
+
+function upcomingCountText(days){
+  if(days===0)return'TODAY';
+  if(days===1)return'tomorrow';
+  if(days<=30)return`in ${days}d`;
+  const weeks=Math.round(days/7);
+  return`in ${weeks}w`;
+}
+
+function renderUpcomingStrip(){
+  const strip=document.getElementById('upcomingStrip');
+  if(!strip)return;
+  const items=collectUpcomingMilestones(3);
+  strip.innerHTML='';
+  for(const{y,m,d,days,ev}of items){
+    const el=document.createElement('button');
+    el.type='button';
+    el.className='upcoming-item'+(days===0?' today':(days<=7?' soon':''));
+    el.innerHTML=`<span class="uc-icon">${ev.icon||'📌'}</span>`
+      +`<span class="uc-title"></span>`
+      +`<span class="uc-count"></span>`;
+    el.querySelector('.uc-title').textContent=ev.title;
+    el.querySelector('.uc-count').textContent=upcomingCountText(days);
+    el.addEventListener('click',()=>openPanel(y,m,d,'events'));
+    strip.appendChild(el);
+  }
+}
+
 function renderCalendar(){
   updateTitle();
+  renderUpcomingStrip();
   document.querySelectorAll('.view-mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===viewMode));
   const topLabels=document.getElementById('topDayLabels');
   const container=document.getElementById('calGrid');
