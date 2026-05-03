@@ -159,18 +159,21 @@ font-family:'Nunito',sans-serif;font-weight:700;cursor:pointer;font-size:.8rem;w
 .upcoming-strip::-webkit-scrollbar{height:4px;}
 .upcoming-strip::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
 .upcoming-item{flex-shrink:0;display:flex;align-items:center;gap:9px;padding:8px 13px;
-border-radius:14px;background:var(--family-lt);color:var(--family-text);
+border-radius:14px;background:var(--bg);color:var(--text);
 font-family:'Nunito',sans-serif;font-weight:800;font-size:.85rem;cursor:pointer;
-border:2px solid transparent;transition:transform .15s,border-color .15s;}
-.upcoming-item:hover{transform:translateY(-1px);border-color:var(--family);}
+border:2px solid transparent;transition:transform .15s,box-shadow .15s;}
+.upcoming-item:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(0,0,0,.12);}
 .upcoming-item .uc-icon{font-size:1.15rem;}
 .upcoming-item .uc-title{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .upcoming-item .uc-count{font-size:.72rem;font-weight:800;background:rgba(255,255,255,.45);
 padding:2px 9px;border-radius:11px;letter-spacing:.02em;}
-.upcoming-item.today{background:linear-gradient(135deg,var(--dad),#60a5fa);color:#fff;
-animation:pulse 2s ease-in-out infinite;}
-.upcoming-item.today .uc-count{background:rgba(255,255,255,.28);color:#fff;}
-.upcoming-item.soon{background:var(--mom-lt);color:var(--mom-text);}
+.upcoming-item.dad      {background:var(--dad-lt);      color:var(--dad-text);}
+.upcoming-item.mom      {background:var(--mom-lt);      color:var(--mom-text);}
+.upcoming-item.charlotte{background:var(--charlotte-lt);color:var(--charlotte-text);}
+.upcoming-item.alice    {background:var(--alice-lt);    color:var(--alice-text);}
+.upcoming-item.family   {background:var(--family-lt);   color:var(--family-text);}
+.upcoming-item.today{animation:pulse 2s ease-in-out infinite;}
+.upcoming-item.today .uc-count{background:#fff;color:#000;}
 
 /* ── CALENDAR GRID ── */
 .day-labels{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-bottom:5px;text-align:center;}
@@ -1710,12 +1713,15 @@ function renderUpcomingStrip(){
   for(const{y,m,d,days,ev}of items){
     const el=document.createElement('button');
     el.type='button';
-    el.className='upcoming-item'+(days===0?' today':(days<=7?' soon':''));
+    const persons=ev.persons||(ev.person?[ev.person]:[]);
+    const personCls=persons.length===1?' '+persons[0]:(persons.length===0?' family':'');
+    el.className='upcoming-item'+personCls+(days===0?' today':'');
     el.innerHTML=`<span class="uc-icon">${ev.icon||'📌'}</span>`
       +`<span class="uc-title"></span>`
       +`<span class="uc-count"></span>`;
     el.querySelector('.uc-title').textContent=ev.title;
     el.querySelector('.uc-count').textContent=upcomingCountText(days);
+    applyPersonStyle(el,ev); // gradient for multi-person events
     el.addEventListener('click',()=>openPanel(y,m,d,'events'));
     strip.appendChild(el);
   }
