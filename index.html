@@ -1139,6 +1139,12 @@ function soccerIcon(s){
   if(/open play/i.test(s))return'🎮';       return'⚽';
 }
 
+// Playmetrics LOCATION is "Field Name, Street, City, State Zip" — keep just the field name.
+function fieldNameFromLocation(loc){
+  if(!loc)return'';
+  return loc.split(',')[0].trim();
+}
+
 function ingestFeed(vevents, feed) {
   let count=0;
   for(const ev of vevents){
@@ -1148,7 +1154,7 @@ function ingestFeed(vevents, feed) {
     let ts=dt.allDay?'All Day':fmt12(dt.time);
     if(ev.dtend&&!dt.allDay)ts+=` – ${fmt12(parseDT(ev.dtend).time)}`;
     events[key].push({title:feed.clean(ev.summary),person:feed.person,
-      time:ts,icon:soccerIcon(ev.summary),location:ev.location||'',uid:ev.uid||'',fromICS:true});
+      time:ts,icon:soccerIcon(ev.summary),location:fieldNameFromLocation(ev.location),uid:ev.uid||'',fromICS:true});
     count++;
   }
   return count;
