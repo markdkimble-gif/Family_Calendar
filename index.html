@@ -1114,6 +1114,7 @@ function parseICS(text) {
     const v=line.slice(c+1).replace(/\\,/g,',').replace(/\\;/g,';').replace(/\\n/g,' ').replace(/\\/g,'').trim();
     if(k==='SUMMARY')cur.summary=v; if(k==='DTSTART')cur.dtstart=line.slice(c+1).trim();
     if(k==='DTEND')cur.dtend=line.slice(c+1).trim(); if(k==='LOCATION')cur.location=v;
+    if(k==='DESCRIPTION')cur.description=v;
     if(k==='STATUS')cur.status=v; if(k==='UID')cur.uid=v;
   }
   return out;
@@ -1139,13 +1140,40 @@ function soccerIcon(s){
   if(/open play/i.test(s))return'🎮';       return'⚽';
 }
 
-// Playmetrics LOCATION is "Field Name, Street, City, State Zip" — keep just the field name.
-function fieldNameFromLocation(loc){
-  if(!loc)return'';
-  return loc.split(',')[0].trim();
+// In Playmetrics: practice DESCRIPTION is the venue (e.g. "National Sports Center Field 26"),
+// game DESCRIPTION is opponent info, and LOCATION is always the street address.
+// So we learn venue↔address pairings from practice-style events, then apply them to games.
+function addressKey(loc){
+  return (loc||'').split(',')[0].trim().toLowerCase();
+}
+function isVenueDescription(desc){
+  if(!desc)return false;
+  if(desc.length>80)return false;
+  if(/<|&amp|&#|http/i.test(desc))return false;
+  if(/\bat\b/i.test(desc)&&/\d/.test(desc))return false; // "Team A at Team B"
+  return true;
+}
+function cleanVenueName(name){
+  return name.replace(/\s+Field\s+\d+.*$/i,'').replace(/\s+\d+v\d+.*$/i,'').trim()||name;
+}
+function buildVenueMap(allEvents){
+  const map=new Map();
+  for(const ev of allEvents){
+    if(!isVenueDescription(ev.description))continue;
+    const k=addressKey(ev.location);
+    if(!k||map.has(k))continue;
+    map.set(k,cleanVenueName(ev.description));
+  }
+  return map;
+}
+function fieldNameForEvent(ev,venueMap){
+  if(isVenueDescription(ev.description))return ev.description.trim();
+  const k=addressKey(ev.location);
+  if(k&&venueMap.has(k))return venueMap.get(k);
+  return ev.location?ev.location.split(',')[0].trim():'';
 }
 
-function ingestFeed(vevents, feed) {
+function ingestFeed(vevents, feed, venueMap) {
   let count=0;
   for(const ev of vevents){
     if(!ev.summary||!ev.dtstart||ev.status==='CANCELLED')continue;
@@ -1154,7 +1182,7 @@ function ingestFeed(vevents, feed) {
     let ts=dt.allDay?'All Day':fmt12(dt.time);
     if(ev.dtend&&!dt.allDay)ts+=` – ${fmt12(parseDT(ev.dtend).time)}`;
     events[key].push({title:feed.clean(ev.summary),person:feed.person,
-      time:ts,icon:soccerIcon(ev.summary),location:fieldNameFromLocation(ev.location),uid:ev.uid||'',fromICS:true});
+      time:ts,icon:soccerIcon(ev.summary),location:fieldNameForEvent(ev,venueMap),uid:ev.uid||'',fromICS:true});
     count++;
   }
   return count;
@@ -1193,11 +1221,24 @@ async function syncICS() {
       }
       throw new Error(`all proxies failed (${errors.join('; ')})`);
     };
+    // Phase 1: fetch + parse all feeds
+    const parsed=[];
     for(const feed of ICS_FEEDS){
       msg.textContent=`Fetching ${feed.person}'s schedule…`;
       try {
         const text=await fetchFeed(feed.url);
-        const count=ingestFeed(parseICS(text), feed);
+        parsed.push({feed, vevents:parseICS(text)});
+      } catch(feedErr) {
+        perFeed.push(`${feed.person}: FAILED`);
+        console.warn(`❌ ${feed.person} feed failed:`, feedErr.message);
+      }
+    }
+    // Phase 2: build address→venue map from all parsed events
+    const venueMap=buildVenueMap(parsed.flatMap(p=>p.vevents));
+    // Phase 3: ingest using the shared venue map
+    for(const {feed, vevents} of parsed){
+      try {
+        const count=ingestFeed(vevents, feed, venueMap);
         perFeed.push(`${feed.person}: ${count}`);
         total+=count;
         console.log(`✅ ${feed.person} feed: ${count} events`);
