@@ -1102,7 +1102,9 @@ function lsGet(k){try{const s=localStorage.getItem(k);return s?JSON.parse(s):nul
 // ICS PARSER
 // ═══════════════════════════════════════════════
 function parseICS(text) {
-  const lines=text.replace(/\r\n[ \t]/g,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  // Normalize newlines to LF first, then unfold continuation lines (RFC 5545 §3.1).
+  // Playmetrics serves LF-only, so a CRLF-only unfold misses the folds entirely.
+  const lines=text.replace(/\r\n?/g,'\n').replace(/\n[ \t]/g,'').split('\n');
   const out=[]; let cur=null;
   for (const raw of lines) {
     const line=raw.trim();
