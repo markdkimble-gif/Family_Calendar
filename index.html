@@ -702,7 +702,7 @@ async function loadEvents() {
       if (!events[r.event_key]) events[r.event_key] = [];
       events[r.event_key].push({ id:r.id, title:r.title, person:r.person,
         persons: Array.isArray(r.persons) && r.persons.length ? r.persons : (r.person ? [r.person] : []),
-        time:r.time, icon:r.icon, location:r.location||'', uid:r.uid||'', fromICS:r.from_ics });
+        time:r.time, icon:r.icon, location:r.location||'', jersey:r.jersey||'', uid:r.uid||'', fromICS:r.from_ics });
     }
     // Safety net: any cached event whose id isn't in the DB result was a local-only
     // save (failed DB insert). Preserve it instead of wiping it from the cache.
@@ -1111,7 +1111,7 @@ function parseICS(text) {
     if (!cur) continue;
     const c=line.indexOf(':'); if(c===-1)continue;
     const k=line.slice(0,c).split(';')[0].toUpperCase();
-    const v=line.slice(c+1).replace(/\\,/g,',').replace(/\\;/g,';').replace(/\\n/g,' ').replace(/\\/g,'').trim();
+    const v=line.slice(c+1).replace(/\\,/g,',').replace(/\\;/g,';').replace(/\\n/g,'\n').replace(/\\/g,'').trim();
     if(k==='SUMMARY')cur.summary=v; if(k==='DTSTART')cur.dtstart=line.slice(c+1).trim();
     if(k==='DTEND')cur.dtend=line.slice(c+1).trim(); if(k==='LOCATION')cur.location=v;
     if(k==='DESCRIPTION')cur.description=v;
@@ -1148,10 +1148,16 @@ function addressKey(loc){
 }
 function isVenueDescription(desc){
   if(!desc)return false;
+  if(desc.includes('\n'))return false;       // games/clinics span multiple lines
   if(desc.length>80)return false;
   if(/<|&amp|&#|http/i.test(desc))return false;
   if(/\bat\b/i.test(desc)&&/\d/.test(desc))return false; // "Team A at Team B"
   return true;
+}
+function extractJersey(desc){
+  if(!desc)return'';
+  const m=desc.match(/^\s*(?:Uniform|Attire):\s*(.+)$/im);
+  return m?m[1].trim():'';
 }
 function cleanVenueName(name){
   return name.replace(/\s+Field\s+\d+.*$/i,'').replace(/\s+\d+v\d+.*$/i,'').trim()||name;
@@ -1182,7 +1188,8 @@ function ingestFeed(vevents, feed, venueMap) {
     let ts=dt.allDay?'All Day':fmt12(dt.time);
     if(ev.dtend&&!dt.allDay)ts+=` – ${fmt12(parseDT(ev.dtend).time)}`;
     events[key].push({title:feed.clean(ev.summary),person:feed.person,
-      time:ts,icon:soccerIcon(ev.summary),location:fieldNameForEvent(ev,venueMap),uid:ev.uid||'',fromICS:true});
+      time:ts,icon:soccerIcon(ev.summary),location:fieldNameForEvent(ev,venueMap),
+      jersey:extractJersey(ev.description),uid:ev.uid||'',fromICS:true});
     count++;
   }
   return count;
@@ -1251,8 +1258,19 @@ async function syncICS() {
     for(const[key,evList]of Object.entries(events))
       for(const ev of evList)
         if(ev.fromICS)rows.push({calendar_id:CALENDAR_ID,event_key:key,title:ev.title,
-          person:ev.person,time:ev.time||'',icon:ev.icon||'',location:ev.location||'',uid:ev.uid||'',from_ics:true});
-    if(rows.length)await db.from('events').insert(rows);
+          person:ev.person,time:ev.time||'',icon:ev.icon||'',location:ev.location||'',
+          jersey:ev.jersey||'',uid:ev.uid||'',from_ics:true});
+    if(rows.length){
+      const {error}=await db.from('events').insert(rows);
+      if(error&&/jersey/i.test(error.message||'')){
+        // jersey column doesn't exist yet — retry without it so events still persist
+        console.warn('jersey column missing in events table — run: ALTER TABLE events ADD COLUMN jersey text;');
+        const fallback=rows.map(({jersey,...r})=>r);
+        await db.from('events').insert(fallback);
+      } else if(error){
+        throw error;
+      }
+    }
     lsSet('fam-events-v6',events);
     renderCalendar(); renderReminders();
     msg.textContent=`✅ Synced ${total} events (${perFeed.join(', ')})`;
@@ -1608,6 +1626,11 @@ function buildDayCell(year,month,day,isCur,opts={}){
         l.className='ec-meta';l.textContent='📍 '+ev.location;
         chip.appendChild(l);
       }
+      if(ev.jersey){
+        const j=document.createElement('div');
+        j.className='ec-meta';j.textContent='👕 '+ev.jersey;
+        chip.appendChild(j);
+      }
     }else{
       chip.textContent=(ev.icon?ev.icon+' ':'')+ev.title;
     }
@@ -1897,6 +1920,7 @@ function mkEvent(ev,key){
   const el=document.createElement('div');el.className=`panel-event ${ev.person}`;
   applyPersonStyle(el,ev);
   const loc=ev.location?`<div class="ev-loc">📍 ${ev.location}</div>`:'';
+  const kit=ev.jersey?`<div class="ev-loc">👕 ${ev.jersey}</div>`:'';
   let multiInfo='';
   if(ev.uid&&ev.uid.startsWith('multi-')){
     const group=getMultiDayGroup(ev.uid);
@@ -1916,7 +1940,7 @@ function mkEvent(ev,key){
   }
   el.innerHTML=`<div class="icon">${ev.icon||'📌'}</div>
     <div class="info"><div class="ev-title">${ev.title}${actions}</div>
-    <div class="ev-sub">${ev.time||''}</div>${multiInfo}${loc}</div>`;
+    <div class="ev-sub">${ev.time||''}</div>${multiInfo}${loc}${kit}</div>`;
   return el;
 }
 
