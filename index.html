@@ -295,6 +295,9 @@ padding:0 4px;opacity:.85;transition:opacity .15s,color .15s,transform .1s;borde
 padding:6px 10px;font-family:'Nunito',sans-serif;font-size:.86rem;outline:none;transition:border .15s;
 background:var(--surface);color:var(--text);}
 .add-form input:focus,.add-form select:focus{border-color:var(--dad);}
+.time-row{display:flex;gap:7px;align-items:center;}
+.time-row input{flex:1;min-width:0;}
+.time-sep{font-size:.74rem;font-weight:700;color:var(--muted);flex:0 0 auto;}
 .btn-add{background:var(--dad);color:#fff;border:none;border-radius:9px;padding:8px;
 font-family:'Nunito',sans-serif;font-weight:800;font-size:.88rem;cursor:pointer;margin-top:2px;transition:opacity .15s;}
 .btn-add:hover{opacity:.85;}
@@ -500,7 +503,11 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
     <div class="add-form">
       <label>➕ Add Event</label>
       <input type="text" id="newTitle" placeholder="What's happening?">
-      <input type="time" id="newTime" value="09:00">
+      <div class="time-row" id="newTimeRow">
+        <input type="time" id="newTime" value="09:00">
+        <span class="time-sep">to</span>
+        <input type="time" id="newEndTime">
+      </div>
       <label class="multi-day-toggle" id="allDayWrap">
         <input type="checkbox" id="allDayChk"> All-day event (e.g. birthday)
       </label>
@@ -619,7 +626,11 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
             <input type="checkbox" id="editAllDayChk"> All-day event (e.g. birthday)
           </label>
           <label id="editTimeLabel">Time</label>
-          <input type="time" id="editTime">
+          <div class="time-row" id="editTimeRow">
+            <input type="time" id="editTime">
+            <span class="time-sep">to</span>
+            <input type="time" id="editEndTime">
+          </div>
         </div>
         <div id="editMultiFields" style="display:none;">
           <label>Start date</label>
@@ -1134,6 +1145,12 @@ function fmt12(t){
   return`${h%12||12}:${String(mn).padStart(2,'0')} ${h>=12?'PM':'AM'}`;
 }
 
+// "09:00" + "20:30" → "9:00 AM – 8:30 PM" (end optional)
+function timeRange(start,end){
+  if(!start)return'';
+  return fmt12(start)+(end?` – ${fmt12(end)}`:'');
+}
+
 function soccerIcon(s){
   if(/game|scrimmage/i.test(s))return'⚽'; if(/practice/i.test(s))return'🏃';
   if(/training/i.test(s))return'🎯';       if(/clinic/i.test(s))return'⭐';
@@ -1187,8 +1204,7 @@ function ingestFeed(vevents, feed, venueMap) {
     if(!ev.summary||!ev.dtstart||ev.status==='CANCELLED')continue;
     const dt=parseDT(ev.dtstart); const key=`${dt.y}-${dt.m}-${dt.d}`;
     if(!events[key])events[key]=[];
-    let ts=dt.allDay?'All Day':fmt12(dt.time);
-    if(ev.dtend&&!dt.allDay)ts+=` – ${fmt12(parseDT(ev.dtend).time)}`;
+    const ts=dt.allDay?'All Day':timeRange(dt.time,ev.dtend?parseDT(ev.dtend).time:'');
     events[key].push({title:feed.clean(ev.summary),person:feed.person,
       time:ts,icon:soccerIcon(ev.summary),location:fieldNameForEvent(ev,venueMap),
       jersey:extractJersey(ev.description),uid:ev.uid||'',fromICS:true});
@@ -1886,7 +1902,7 @@ function switchPanelTab(tab){
     document.getElementById('endDate').value=isoDate(y,m,d);
     document.getElementById('multiDayChk').checked=false;
     document.getElementById('multiDayFields').style.display='none';
-    document.getElementById('newTime').style.display='';
+    document.getElementById('newTimeRow').style.display='';
   }
   if(tab==='meal')renderMealPicker(y,m,d);
 }
@@ -2394,12 +2410,12 @@ document.getElementById('libAddBtn').addEventListener('click',async()=>{
 document.getElementById('multiDayChk').addEventListener('change',e=>{
   const on=e.target.checked;
   document.getElementById('multiDayFields').style.display=on?'':'none';
-  document.getElementById('newTime').style.display=on?'none':(document.getElementById('allDayChk').checked?'none':'');
+  document.getElementById('newTimeRow').style.display=on?'none':(document.getElementById('allDayChk').checked?'none':'');
   document.getElementById('allDayWrap').style.display=on?'none':'';
 });
 
 document.getElementById('allDayChk').addEventListener('change',e=>{
-  document.getElementById('newTime').style.display=e.target.checked?'none':'';
+  document.getElementById('newTimeRow').style.display=e.target.checked?'none':'';
 });
 
 document.getElementById('addEventBtn').addEventListener('click',async()=>{
@@ -2407,6 +2423,7 @@ document.getElementById('addEventBtn').addEventListener('click',async()=>{
   const y=+panel.dataset.y,m=+panel.dataset.m,d=+panel.dataset.d;
   const title=document.getElementById('newTitle').value.trim();
   const time=document.getElementById('newTime').value;
+  const endTime=document.getElementById('newEndTime').value;
   const persons=getSelectedPersons('newPersonPills');
   const isMulti=document.getElementById('multiDayChk').checked;
   const endDateStr=document.getElementById('endDate').value;
@@ -2430,16 +2447,17 @@ document.getElementById('addEventBtn').addEventListener('click',async()=>{
     }
   }else{
     const allDay=document.getElementById('allDayChk').checked;
-    const t=allDay?'All Day':fmt12(time);
+    const t=allDay?'All Day':timeRange(time,endTime);
     await addEv(y,m,d,{title,time:t,person,persons,icon});
   }
 
   document.getElementById('newTitle').value='';
+  document.getElementById('newEndTime').value='';
   document.getElementById('multiDayChk').checked=false;
   document.getElementById('multiDayFields').style.display='none';
   document.getElementById('allDayChk').checked=false;
   document.getElementById('allDayWrap').style.display='';
-  document.getElementById('newTime').style.display='';
+  document.getElementById('newTimeRow').style.display='';
   setSelectedPersons('newPersonPills',[]);
   renderCalendar();
   if(y===today.getFullYear()&&m===today.getMonth()&&d===today.getDate())renderReminders();
@@ -2451,9 +2469,10 @@ document.getElementById('addEventBtn').addEventListener('click',async()=>{
 // ═══════════════════════════════════════════════
 let editingState=null; // {key, id, uid, group:[{key,ev}]}
 
-function parse12to24(s){
+// which=0 → start time, which=1 → end time of a "6:00 PM – 8:30 PM" range
+function parse12to24(s,which=0){
   if(!s||s==='All Day')return '';
-  const part=s.split('–')[0].trim();
+  const part=(s.split('–')[which]||'').trim();
   const m=part.match(/^(\d+):(\d{2})\s*(AM|PM)?/i);
   if(!m)return '';
   let h=+m[1];const min=m[2];const ap=(m[3]||'').toUpperCase();
@@ -2482,9 +2501,10 @@ function openEditEvent(key,id){
   document.getElementById('editStartDate').value=isoDate(sy,sm,sd);
   document.getElementById('editEndDate').value=isoDate(ey,em,ed);
   document.getElementById('editTime').value=parse12to24(ev.time)||'09:00';
+  document.getElementById('editEndTime').value=parse12to24(ev.time,1);
   const isAllDay=ev.time==='All Day'&&!(isMulti&&group.length>1);
   document.getElementById('editAllDayChk').checked=isAllDay;
-  document.getElementById('editTime').style.display=isAllDay?'none':'';
+  document.getElementById('editTimeRow').style.display=isAllDay?'none':'';
   document.getElementById('editTimeLabel').style.display=isAllDay?'none':'';
 
   toggleEditFields(isMulti&&group.length>1);
@@ -2501,7 +2521,7 @@ document.getElementById('editMultiChk').addEventListener('change',e=>{
 });
 document.getElementById('editAllDayChk').addEventListener('change',e=>{
   const on=e.target.checked;
-  document.getElementById('editTime').style.display=on?'none':'';
+  document.getElementById('editTimeRow').style.display=on?'none':'';
   document.getElementById('editTimeLabel').style.display=on?'none':'';
 });
 document.getElementById('closeEditModal').addEventListener('click',()=>{
@@ -2563,7 +2583,8 @@ document.getElementById('editSaveBtn').addEventListener('click',async()=>{
   }else{
     const allDay=document.getElementById('editAllDayChk').checked;
     const time=document.getElementById('editTime').value;
-    const t=allDay?'All Day':fmt12(time);
+    const endTime=document.getElementById('editEndTime').value;
+    const t=allDay?'All Day':timeRange(time,endTime);
     await addEv(plan.y,plan.m,plan.d,{title,time:t,person,persons,icon});
   }
 
