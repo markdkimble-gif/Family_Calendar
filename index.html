@@ -17,6 +17,7 @@
   --charlotte:#f97316; --charlotte-lt:#ffedd5; --charlotte-text:#c2410c;
   --alice:#06b6d4;  --alice-lt:#cffafe;     --alice-text:#0e7490;
   --family:#10b981; --family-lt:#d1fae5;    --family-text:#065f46;
+  --school:#ec4899; --school-lt:#fce7f3;    --school-text:#9d174d;
   --meal:#f59e0b;   --meal-lt:#fef3c7;      --meal-text:#92400e;
   --meal-border:#fde68a; --meal-hover:#fde68a;
   --text:#1e293b; --muted:#64748b; --today-ring:#3b82f6;
@@ -30,6 +31,7 @@
   --charlotte:#fb923c; --charlotte-lt:#7c2d12; --charlotte-text:#fed7aa;
   --alice:#22d3ee;  --alice-lt:#155e75;     --alice-text:#a5f3fc;
   --family:#34d399; --family-lt:#064e3b;    --family-text:#a7f3d0;
+  --school:#f472b6; --school-lt:#831843;    --school-text:#fbcfe8;
   --meal:#fbbf24;   --meal-lt:#78350f;      --meal-text:#fde68a;
   --meal-border:#92400e; --meal-hover:#92400e;
   --text:#f1f5f9; --muted:#94a3b8; --today-ring:#60a5fa;
@@ -172,6 +174,7 @@ padding:2px 9px;border-radius:11px;letter-spacing:.02em;}
 .upcoming-item.charlotte{background:var(--charlotte-lt);color:var(--charlotte-text);}
 .upcoming-item.alice    {background:var(--alice-lt);    color:var(--alice-text);}
 .upcoming-item.family   {background:var(--family-lt);   color:var(--family-text);}
+.upcoming-item.school   {background:var(--school-lt);   color:var(--school-text);}
 .upcoming-item.today{animation:pulse 2s ease-in-out infinite;}
 .upcoming-item.today .uc-count{background:#fff;color:#000;}
 
@@ -204,6 +207,7 @@ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transit
 .event-chip.charlotte{background:var(--charlotte-lt);color:var(--charlotte-text);}
 .event-chip.alice    {background:var(--alice-lt);    color:var(--alice-text);}
 .event-chip.family   {background:var(--family-lt);   color:var(--family-text);}
+.event-chip.school   {background:var(--school-lt);   color:var(--school-text);}
 .more-chip{font-size:.64rem;font-weight:700;color:var(--muted);padding:1px 4px;cursor:pointer;}
 
 /* ── WEEKLY MEAL STRIP ── */
@@ -278,6 +282,7 @@ letter-spacing:.07em;color:var(--muted);margin-top:6px;}
 .panel-event.charlotte{background:var(--charlotte-lt);}
 .panel-event.alice    {background:var(--alice-lt);}
 .panel-event.family   {background:var(--family-lt);}
+.panel-event.school   {background:var(--school-lt);}
 .panel-event.meal     {background:var(--meal-lt);}
 .empty-day{text-align:center;color:var(--muted);font-weight:600;padding:26px 0;font-size:.88rem;}
 
@@ -449,7 +454,7 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
     <button class="view-mode-btn" data-mode="month">Month</button>
     <button class="view-mode-btn" data-mode="quarter">3 Months</button>
   </div>
-  <button class="sync-btn" id="syncBtn">⚽ Sync Soccer</button>
+  <button class="sync-btn" id="syncBtn">⚽🏫 Sync Feeds</button>
   <button class="meal-lib-btn" id="mealLibBtn">🍽️ Meal Library</button>
   <button class="refresh-btn" id="refreshBtn" title="Refresh from cloud">🔄</button>
   <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">🌙</button>
@@ -459,6 +464,7 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
     <div class="legend-item" data-person="charlotte"><div class="legend-dot" style="background:var(--charlotte)"></div>Charlotte</div>
     <div class="legend-item" data-person="alice"><div class="legend-dot" style="background:var(--alice)"></div>Alice</div>
     <div class="legend-item" data-person="family"><div class="legend-dot" style="background:var(--family)"></div>Family</div>
+    <div class="legend-item" data-person="school"><div class="legend-dot" style="background:var(--school)"></div>School</div>
     <div class="legend-item"><div class="legend-dot" style="background:var(--meal)"></div>Meals</div>
   </div>
 </header>
@@ -662,9 +668,16 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ═══════════════════════════════════════════════
 const ICS_FEEDS = [
   { url:'https://calendar.playmetrics.com/calendars/c593/t388183/p0/t7C9EE09B/f/calendar.ics',
-    person:'charlotte', clean:s=>s.replace(/^(?:CANCELED\s+)?2014G North Suburban Academy Carolina\s*[-–]\s*/i,'').trim() },
+    person:'charlotte', label:'Charlotte soccer',
+    clean:s=>s.replace(/^(?:CANCELED\s+)?2014G North Suburban Academy Carolina\s*[-–]\s*/i,'').trim() },
   { url:'https://calendar.playmetrics.com/calendars/c593/t388170/p0/t06879D58/f/calendar.ics',
-    person:'alice',     clean:s=>s.replace(/^(?:CANCELED\s+)?2017G North Suburban Academy Carolina\s*[-–]\s*/i,'').trim() }
+    person:'alice',     label:'Alice soccer',
+    clean:s=>s.replace(/^(?:CANCELED\s+)?2017G North Suburban Academy Carolina\s*[-–]\s*/i,'').trim() },
+  // Mounds View district calendar (calendar_ids=44) — all-day closure/term-boundary
+  // notices only, so no venue lookup, no jersey, and its own icon set.
+  { url:'https://www.mvpschools.org/fs/calendar-manager/events.ics?calendar_ids=44',
+    person:'school',    label:'School district', noVenue:true, icon:schoolIcon,
+    clean:s=>s.trim().replace(/\s{2,}/g,' ').replace(/^no school/i,'No School') }
 ];
 const PROXY = 'https://api.allorigins.win/raw?url=';
 const PROXIES = [
@@ -685,11 +698,21 @@ let events    = {}; // "Y-M-D" → [{id,title,person,time,icon,location,uid,from
 let meals     = {}; // "Y-M-D" → {id, mealId, name, icon, sides:[{id,name,icon}]}
 let mealLib   = []; // [{id, name, icon, timesUsed, lastUsed}]
 let sideLib   = []; // [{id, name, icon, timesUsed, lastUsed}] (localStorage only)
-const ALL_PERSONS = ['dad','mom','charlotte','alice','family'];
+const ALL_PERSONS = ['dad','mom','charlotte','alice','family','school'];
 let activePersonFilter = (() => {
   try {
     const saved = localStorage.getItem('fam-person-filter');
-    if (saved) return new Set(JSON.parse(saved));
+    if (saved) {
+      const set = new Set(JSON.parse(saved));
+      // One-time: filters saved before the school feed existed have no 'school'
+      // entry, which would silently hide every school event. Opt them in once.
+      if (!localStorage.getItem('fam-school-filter-v1')) {
+        set.add('school');
+        localStorage.setItem('fam-school-filter-v1', '1');
+        localStorage.setItem('fam-person-filter', JSON.stringify([...set]));
+      }
+      return set;
+    }
   } catch(e) {}
   return new Set(ALL_PERSONS);
 })();
@@ -1159,6 +1182,13 @@ function soccerIcon(s){
   if(/open play/i.test(s))return'🎮';       return'⚽';
 }
 
+function schoolIcon(s){
+  if(/no school|break|holiday/i.test(s))return'🚫';
+  if(/first .*day|last .*day/i.test(s))return'🎒';
+  if(/conference/i.test(s))return'🗣️';       if(/early release|late start/i.test(s))return'⏰';
+  if(/graduation/i.test(s))return'🎓';       return'🏫';
+}
+
 // In Playmetrics: practice DESCRIPTION is the venue (e.g. "National Sports Center Field 26"),
 // game DESCRIPTION is opponent info, and LOCATION is always the street address.
 // So we learn venue↔address pairings from practice-style events, then apply them to games.
@@ -1205,9 +1235,11 @@ function ingestFeed(vevents, feed, venueMap) {
     const dt=parseDT(ev.dtstart); const key=`${dt.y}-${dt.m}-${dt.d}`;
     if(!events[key])events[key]=[];
     const ts=dt.allDay?'All Day':timeRange(dt.time,ev.dtend?parseDT(ev.dtend).time:'');
+    const pickIcon=feed.icon||soccerIcon;
     events[key].push({title:feed.clean(ev.summary),person:feed.person,
-      time:ts,icon:soccerIcon(ev.summary),location:fieldNameForEvent(ev,venueMap),
-      jersey:extractJersey(ev.description),uid:ev.uid||'',fromICS:true});
+      time:ts,icon:pickIcon(ev.summary),
+      location:feed.noVenue?(ev.location||'').trim():fieldNameForEvent(ev,venueMap),
+      jersey:feed.noVenue?'':extractJersey(ev.description),uid:ev.uid||'',fromICS:true});
     count++;
   }
   return count;
@@ -1219,57 +1251,65 @@ function ingestFeed(vevents, feed, venueMap) {
 async function syncICS() {
   const btn=document.getElementById('syncBtn'), bar=document.getElementById('syncBar'), msg=document.getElementById('syncMsg');
   btn.classList.add('syncing'); btn.textContent='⟳ Syncing…';
-  bar.classList.remove('hidden'); msg.textContent='Fetching soccer schedules…';
+  bar.classList.remove('hidden'); msg.textContent='Fetching calendar feeds…';
   try {
     await clearICSFromDB();
     let total=0;
     const perFeed=[];
+    const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     const fetchFeed=async(url)=>{
       const errors=[];
-      for (let i=0; i<PROXIES.length; i++) {
-        const buildUrl=PROXIES[i];
-        const proxyName=['allorigins','corsproxy.io','codetabs'][i]||`proxy${i}`;
-        try {
-          const res=await fetch(buildUrl(url));
-          if(res.ok){
-            const text=await res.text();
-            if(text.includes('BEGIN:VEVENT')){
-              return text;
+      // The public proxies return intermittent 5xx, so make two full passes
+      // before declaring a feed dead — one bad round shouldn't drop a schedule.
+      for (let attempt=0; attempt<2; attempt++) {
+        for (let i=0; i<PROXIES.length; i++) {
+          const buildUrl=PROXIES[i];
+          const proxyName=['allorigins','corsproxy.io','codetabs'][i]||`proxy${i}`;
+          try {
+            const res=await fetch(buildUrl(url));
+            if(res.ok){
+              const text=await res.text();
+              if(text.includes('BEGIN:VEVENT')){
+                return text;
+              }
+              errors.push(`${proxyName}: no VEVENTs in response`);
+              continue;
             }
-            errors.push(`${proxyName}: no VEVENTs in response`);
-            continue;
+            errors.push(`${proxyName}: HTTP ${res.status}`);
+          } catch(e) {
+            errors.push(`${proxyName}: ${e.message}`);
           }
-          errors.push(`${proxyName}: HTTP ${res.status}`);
-        } catch(e) {
-          errors.push(`${proxyName}: ${e.message}`);
         }
+        if(attempt===0)await sleep(800);
       }
       throw new Error(`all proxies failed (${errors.join('; ')})`);
     };
     // Phase 1: fetch + parse all feeds
     const parsed=[];
     for(const feed of ICS_FEEDS){
-      msg.textContent=`Fetching ${feed.person}'s schedule…`;
+      const name=feed.label||feed.person;
+      msg.textContent=`Fetching ${name}…`;
       try {
         const text=await fetchFeed(feed.url);
         parsed.push({feed, vevents:parseICS(text)});
       } catch(feedErr) {
-        perFeed.push(`${feed.person}: FAILED`);
-        console.warn(`❌ ${feed.person} feed failed:`, feedErr.message);
+        perFeed.push(`${name}: FAILED`);
+        console.warn(`❌ ${name} feed failed:`, feedErr.message);
       }
     }
     // Phase 2: build address→venue map from all parsed events
     const venueMap=buildVenueMap(parsed.flatMap(p=>p.vevents));
     // Phase 3: ingest using the shared venue map
     for(const {feed, vevents} of parsed){
+      const name=feed.label||feed.person;
       try {
         const count=ingestFeed(vevents, feed, venueMap);
-        perFeed.push(`${feed.person}: ${count}`);
+        perFeed.push(`${name}: ${count}`);
         total+=count;
-        console.log(`✅ ${feed.person} feed: ${count} events`);
+        console.log(`✅ ${name} feed: ${count} events`);
       } catch(feedErr) {
-        perFeed.push(`${feed.person}: FAILED`);
-        console.warn(`❌ ${feed.person} feed failed:`, feedErr.message);
+        perFeed.push(`${name}: FAILED`);
+        console.warn(`❌ ${name} feed failed:`, feedErr.message);
       }
     }
     const rows=[];
@@ -1278,26 +1318,38 @@ async function syncICS() {
         if(ev.fromICS)rows.push({calendar_id:CALENDAR_ID,event_key:key,title:ev.title,
           person:ev.person,time:ev.time||'',icon:ev.icon||'',location:ev.location||'',
           jersey:ev.jersey||'',uid:ev.uid||'',from_ics:true});
+    let schoolCloudFail=false;
     if(rows.length){
-      const {error}=await db.from('events').insert(rows);
+      let payload=rows;
+      let {error}=await db.from('events').insert(payload);
       if(error&&/jersey/i.test(error.message||'')){
         // jersey column doesn't exist yet — retry without it so events still persist
         console.warn('jersey column missing in events table — run: ALTER TABLE events ADD COLUMN jersey text;');
-        const fallback=rows.map(({jersey,...r})=>r);
-        await db.from('events').insert(fallback);
-      } else if(error){
-        throw error;
+        payload=payload.map(({jersey,...r})=>r);
+        ({error}=await db.from('events').insert(payload));
       }
+      if(error&&/person|constraint|check/i.test(error.message||'')&&payload.some(r=>r.person==='school')){
+        // An older CHECK constraint on events.person may not allow 'school'.
+        // Save everything else rather than failing the whole sync; school events
+        // still render this session from the local cache.
+        console.warn("events.person rejected 'school' — school events not saved to cloud. "
+          +'Fix: drop/extend the person check constraint on the events table. Details:', error.message);
+        schoolCloudFail=true;
+        payload=payload.filter(r=>r.person!=='school');
+        error=payload.length?(await db.from('events').insert(payload)).error:null;
+      }
+      if(error)throw error;
     }
     lsSet('fam-events-v6',events);
     renderCalendar(); renderReminders();
-    msg.textContent=`✅ Synced ${total} events (${perFeed.join(', ')})`;
+    msg.textContent=`✅ Synced ${total} events (${perFeed.join(', ')})`
+      +(schoolCloudFail?' — ⚠️ school events local only, see console':'');
     setTimeout(()=>bar.classList.add('hidden'),6000);
   } catch(e){
     msg.textContent='⚠️ Sync failed — check connection.'; console.error(e);
     setTimeout(()=>bar.classList.add('hidden'),5000);
   }
-  btn.classList.remove('syncing'); btn.textContent='⚽ Sync Soccer';
+  btn.classList.remove('syncing'); btn.textContent='⚽🏫 Sync Feeds';
 }
 document.getElementById('syncBtn').addEventListener('click',syncICS);
 
@@ -1521,7 +1573,7 @@ function renderReminders(){
 // ═══════════════════════════════════════════════
 // PERSON PILLS (multi-select)
 // ═══════════════════════════════════════════════
-const PERSON_ICONS={dad:'✈️',mom:'💜',charlotte:'⭐',alice:'🧜‍♀️',family:'🏠'};
+const PERSON_ICONS={dad:'✈️',mom:'💜',charlotte:'⭐',alice:'🧜‍♀️',family:'🏠',school:'🏫'};
 
 function initPersonPills(containerId){
   document.querySelectorAll(`#${containerId} .person-pill`).forEach(el=>{
@@ -1917,6 +1969,7 @@ function renderPanelBody(y,m,d){
   const evs=(events[key]||[]).filter(eventVisible);
   body.innerHTML='';
   if(!evs.length){body.innerHTML='<div class="empty-day">No events — enjoy the free day! 🌤️</div>';return;}
+  const school =evs.filter(e=>e.fromICS&&e.person==='school');
   const cSoccer=evs.filter(e=>e.fromICS&&e.person==='charlotte');
   const aSoccer=evs.filter(e=>e.fromICS&&e.person==='alice');
   const isMultiP=e=>e.uid&&e.uid.startsWith('multi-');
@@ -1925,6 +1978,7 @@ function renderPanelBody(y,m,d){
     const rank=e=>isAllDayP(e)?0:(isMultiP(e)?1:2);
     return rank(a)-rank(b);
   });
+  if(school.length){addSection(body,'🏫 School – Mounds View District');school.forEach(ev=>body.appendChild(mkEvent(ev,key)));}
   if(cSoccer.length){addSection(body,'🟠 Charlotte – NSSA 2014G');cSoccer.forEach(ev=>body.appendChild(mkEvent(ev,key)));}
   if(aSoccer.length){addSection(body,'🩵 Alice – NSSA 2017G');aSoccer.forEach(ev=>body.appendChild(mkEvent(ev,key)));}
   if(personal.length){addSection(body,'👨‍👩‍👧‍👦 Family Events');personal.forEach(ev=>body.appendChild(mkEvent(ev,key)));}
