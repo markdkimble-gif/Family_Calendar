@@ -1228,19 +1228,38 @@ function fieldNameForEvent(ev,venueMap){
   return ev.location?ev.location.split(',')[0].trim():'';
 }
 
+// An all-day VEVENT's DTEND is exclusive (RFC 5545 §3.6.1), so spring break
+// published as DTSTART 3/8 + DTEND 3/13 covers Mar 8–12 — five days, one VEVENT.
+function allDaySpan(start,end){
+  const a=new Date(start.y,start.m,start.d), b=new Date(end.y,end.m,end.d);
+  const n=Math.round((b-a)/86400000);
+  return Math.min(Math.max(n,1),60); // clamp so a malformed feed can't flood the calendar
+}
+
 function ingestFeed(vevents, feed, venueMap) {
   let count=0;
   for(const ev of vevents){
     if(!ev.summary||!ev.dtstart||ev.status==='CANCELLED')continue;
-    const dt=parseDT(ev.dtstart); const key=`${dt.y}-${dt.m}-${dt.d}`;
-    if(!events[key])events[key]=[];
-    const ts=dt.allDay?'All Day':timeRange(dt.time,ev.dtend?parseDT(ev.dtend).time:'');
+    const dt=parseDT(ev.dtstart);
+    const endDt=ev.dtend?parseDT(ev.dtend):null;
+    const ts=dt.allDay?'All Day':timeRange(dt.time,endDt?endDt.time:'');
     const pickIcon=feed.icon||soccerIcon;
-    events[key].push({title:feed.clean(ev.summary),person:feed.person,
+    const base={title:feed.clean(ev.summary),person:feed.person,
       time:ts,icon:pickIcon(ev.summary),
       location:feed.noVenue?(ev.location||'').trim():fieldNameForEvent(ev,venueMap),
-      jersey:feed.noVenue?'':extractJersey(ev.description),uid:ev.uid||'',fromICS:true});
-    count++;
+      jersey:feed.noVenue?'':extractJersey(ev.description),uid:ev.uid||'',fromICS:true};
+    const days=dt.allDay&&endDt&&endDt.allDay?allDaySpan(dt,endDt):1;
+    // Spread a multi-day span across every day it covers, sharing one "multi-"
+    // uid so the grid draws it as a connected band (same as manual trips).
+    const groupUid=days>1?'multi-ics-'+(ev.uid||`${dt.y}${dt.m}${dt.d}-${base.title}`):base.uid;
+    const cur=new Date(dt.y,dt.m,dt.d);
+    for(let i=0;i<days;i++){
+      const key=`${cur.getFullYear()}-${cur.getMonth()}-${cur.getDate()}`;
+      if(!events[key])events[key]=[];
+      events[key].push({...base,uid:groupUid});
+      count++;
+      cur.setDate(cur.getDate()+1);
+    }
   }
   return count;
 }
