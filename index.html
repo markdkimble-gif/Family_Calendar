@@ -667,12 +667,12 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ICS FEEDS
 // ═══════════════════════════════════════════════
 const ICS_FEEDS = [
-  { url:'https://calendar.playmetrics.com/calendars/c593/t388183/p0/t7C9EE09B/f/calendar.ics',
+  { url:'https://calendar.playmetrics.com/calendars/c593/t584818/p0/t5D579B8A/f/calendar.ics',
     person:'charlotte', label:'Charlotte soccer',
-    clean:s=>s.replace(/^(?:CANCELED\s+)?2014G North Suburban Academy Carolina\s*[-–]\s*/i,'').trim() },
-  { url:'https://calendar.playmetrics.com/calendars/c593/t388170/p0/t06879D58/f/calendar.ics',
+    clean:s=>s.replace(/^(?:CANCELED\s+)?North Surf G2013\/14 Royal\s*[-–]\s*/i,'').trim() },
+  { url:'https://calendar.playmetrics.com/calendars/c593/t584718/p0/t3B8CF5DB/f/calendar.ics',
     person:'alice',     label:'Alice soccer',
-    clean:s=>s.replace(/^(?:CANCELED\s+)?2017G North Suburban Academy Carolina\s*[-–]\s*/i,'').trim() },
+    clean:s=>s.replace(/^(?:CANCELED\s+)?North Surf G2016\/17 Royal\s*[-–]\s*/i,'').trim() },
   // Mounds View district calendar (calendar_ids=44) — all-day closure/term-boundary
   // notices only, so no venue lookup, no jersey, and its own icon set.
   { url:'https://www.mvpschools.org/fs/calendar-manager/events.ics?calendar_ids=44',
