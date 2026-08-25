@@ -1174,6 +1174,25 @@ function timeRange(start,end){
   return fmt12(start)+(end?` – ${fmt12(end)}`:'');
 }
 
+// "3:30 PM – 5:00 PM" → 930 (minutes past midnight). All-day / untimed → -1, so they sort first.
+function startMinutes(ev){
+  const m=/(\d{1,2}):(\d{2})\s*([AP])M/i.exec(ev.time||'');
+  if(!m)return -1;
+  const h=(+m[1]%12)+(/p/i.test(m[3])?12:0);
+  return h*60+ +m[2];
+}
+
+// Chronological order within one day. Untimed events lead; among those the multi-day
+// bars come last and keep a stable uid order so they line up across cells.
+function byStartTime(a,b){
+  const am=startMinutes(a),bm=startMinutes(b);
+  if(am!==bm)return am-bm;
+  const rank=e=>(e.uid&&e.uid.startsWith('multi-'))?1:0;
+  if(rank(a)!==rank(b))return rank(a)-rank(b);
+  if(rank(a)===1)return String(a.uid).localeCompare(String(b.uid));
+  return (a.title||'').localeCompare(b.title||'');
+}
+
 function soccerIcon(s){
   if(/game|scrimmage/i.test(s))return'⚽'; if(/practice/i.test(s))return'🏃';
   if(/training/i.test(s))return'🎯';       if(/clinic/i.test(s))return'⭐';
@@ -1573,7 +1592,7 @@ function renderReminders(){
   area.innerHTML='';
   for(const[person,emoji,cls]of[['charlotte','🔔','charlotte-banner'],['alice','🧜‍♀️','alice-banner']]){
     if(!activePersonFilter.has(person))continue;
-    const mine=(events[key]||[]).filter(e=>e.person===person&&e.fromICS);
+    const mine=(events[key]||[]).filter(e=>e.person===person&&e.fromICS).sort(byStartTime);
     if(!mine.length)continue;
     const name=person[0].toUpperCase()+person.slice(1);
     const items=mine.slice(0,3).map(e=>{
@@ -1674,14 +1693,7 @@ function buildDayCell(year,month,day,isCur,opts={}){
   numEl.className='day-num';numEl.textContent=day;
   cell.appendChild(numEl);
   const isMulti=e=>e.uid&&e.uid.startsWith('multi-');
-  const isAllDaySingle=e=>!isMulti(e)&&e.time==='All Day';
-  const sorted=[
-    ...dayEvs.filter(isAllDaySingle),
-    ...dayEvs.filter(isMulti).sort((a,b)=>a.uid.localeCompare(b.uid)),
-    ...dayEvs.filter(e=>!isMulti(e)&&!isAllDaySingle(e)&&e.fromICS&&e.person==='charlotte'),
-    ...dayEvs.filter(e=>!isMulti(e)&&!isAllDaySingle(e)&&e.fromICS&&e.person==='alice'),
-    ...dayEvs.filter(e=>!isMulti(e)&&!isAllDaySingle(e)&&!e.fromICS),
-  ];
+  const sorted=dayEvs.slice().sort(byStartTime);
   const MAX=detail?Infinity:3;
   sorted.slice(0,MAX).forEach(ev=>{
     const chip=document.createElement('div');
@@ -1985,22 +1997,19 @@ document.querySelectorAll('.panel-tab').forEach(btn=>{
 function renderPanelBody(y,m,d){
   const body=document.getElementById('panelBody');
   const key=`${y}-${m}-${d}`;
-  const evs=(events[key]||[]).filter(eventVisible);
+  const evs=(events[key]||[]).filter(eventVisible).sort(byStartTime);
   body.innerHTML='';
   if(!evs.length){body.innerHTML='<div class="empty-day">No events — enjoy the free day! 🌤️</div>';return;}
-  const school =evs.filter(e=>e.fromICS&&e.person==='school');
-  const cSoccer=evs.filter(e=>e.fromICS&&e.person==='charlotte');
-  const aSoccer=evs.filter(e=>e.fromICS&&e.person==='alice');
-  const isMultiP=e=>e.uid&&e.uid.startsWith('multi-');
-  const isAllDayP=e=>!isMultiP(e)&&e.time==='All Day';
-  const personal=evs.filter(e=>!e.fromICS).sort((a,b)=>{
-    const rank=e=>isAllDayP(e)?0:(isMultiP(e)?1:2);
-    return rank(a)-rank(b);
-  });
-  if(school.length){addSection(body,'🏫 School – Mounds View District');school.forEach(ev=>body.appendChild(mkEvent(ev,key)));}
-  if(cSoccer.length){addSection(body,'🟠 Charlotte – NSSA 2014G');cSoccer.forEach(ev=>body.appendChild(mkEvent(ev,key)));}
-  if(aSoccer.length){addSection(body,'🩵 Alice – NSSA 2017G');aSoccer.forEach(ev=>body.appendChild(mkEvent(ev,key)));}
-  if(personal.length){addSection(body,'👨‍👩‍👧‍👦 Family Events');personal.forEach(ev=>body.appendChild(mkEvent(ev,key)));}
+  // One chronological list, earliest first. All-day items lead; headings appear only
+  // when the day has both kinds, so a single-kind day stays a clean flat list.
+  const add=list=>list.forEach(ev=>body.appendChild(mkEvent(ev,key)));
+  const allDay=evs.filter(e=>startMinutes(e)<0), timed=evs.filter(e=>startMinutes(e)>=0);
+  if(allDay.length&&timed.length){
+    addSection(body,'📌 All Day');   add(allDay);
+    addSection(body,'🕐 Scheduled'); add(timed);
+  }else{
+    add(evs);
+  }
 }
 
 function addSection(parent,label){
