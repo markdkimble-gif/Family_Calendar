@@ -431,6 +431,90 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
 .lib-type-btn.active{background:var(--meal);color:#fff;border-color:var(--meal);}
 .lib-type-btn:not(.active):hover{color:var(--text);}
 
+/* ── LUNCH: HOME vs SCHOOL ── */
+.lunch-lib-btn{background:var(--meal-lt);color:var(--meal-text);border:2px solid var(--meal);border-radius:20px;
+padding:5px 13px;font-family:'Nunito',sans-serif;font-weight:700;font-size:.8rem;cursor:pointer;
+transition:all .15s;display:flex;align-items:center;gap:5px;}
+.lunch-lib-btn:hover{background:var(--meal);color:#fff;}
+
+/* Day-cell badge — only shown on days someone needs a lunch packed */
+.lunch-badge{margin-top:auto;align-self:flex-start;display:flex;align-items:center;gap:3px;
+flex-wrap:wrap;padding:2px 5px;border-radius:7px;background:var(--bg);cursor:pointer;
+transition:background .15s;flex-shrink:0;max-width:100%;}
+.lunch-badge:hover{background:var(--meal-lt);}
+.lunch-badge .lb-icon{font-size:.72rem;line-height:1;}
+.lunch-badge .lb-kid{font-size:.6rem;font-weight:800;line-height:1;padding:1px 5px;border-radius:6px;}
+.lunch-badge .lb-kid.charlotte{background:var(--charlotte-lt);color:var(--charlotte-text);}
+.lunch-badge .lb-kid.alice{background:var(--alice-lt);color:var(--alice-text);}
+.cal-grid.week-view .lunch-badge{margin-top:4px;padding:5px 9px;gap:5px;}
+.cal-grid.week-view .lunch-badge .lb-icon{font-size:1rem;}
+.cal-grid.week-view .lunch-badge .lb-kid{font-size:.76rem;padding:3px 8px;}
+.cal-multi .lunch-badge{padding:1px 2px;gap:2px;}
+.cal-multi .lunch-badge .lb-icon{font-size:.6rem;}
+.cal-multi .lunch-badge .lb-kid{font-size:.52rem;padding:0 3px;}
+
+/* Lunch banner (today / tomorrow packing nudge) */
+.reminder-banner.lunch-banner{background:linear-gradient(135deg,#f59e0b,#fbbf24);
+box-shadow:0 4px 16px rgba(245,158,11,.28);}
+.lunch-banner .rem-text strong{display:inline;font-size:.88rem;margin:0;}
+.lunch-banner .rem-text{color:#3f2d05;}
+
+/* Side-panel lunch tab */
+.lunch-panel{padding:16px 18px;display:flex;flex-direction:column;gap:10px;}
+.lunch-note{font-size:.8rem;font-weight:700;color:var(--muted);background:var(--bg);
+border-radius:10px;padding:9px 12px;line-height:1.45;}
+.lunch-row{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:12px;
+border:2px solid var(--border);background:var(--surface);cursor:pointer;
+transition:background .15s,border-color .15s;user-select:none;}
+.lunch-row:hover{border-color:#cbd5e1;}
+.lunch-row input{width:19px;height:19px;margin:0;cursor:pointer;flex-shrink:0;accent-color:var(--meal);}
+.lunch-row .lr-name{font-weight:800;font-size:.92rem;flex-shrink:0;}
+.lunch-row .lr-state{font-size:.76rem;font-weight:700;margin-left:auto;padding:3px 10px;
+border-radius:11px;background:var(--bg);color:var(--muted);white-space:nowrap;}
+.lunch-row.packed{background:var(--meal-lt);border-color:var(--meal);}
+.lunch-row.packed .lr-state{background:var(--meal);color:#fff;}
+.lunch-row.charlotte .lr-name{color:var(--charlotte-text);}
+.lunch-row.alice .lr-name{color:var(--alice-text);}
+.lunch-quick{display:flex;gap:6px;}
+.lunch-quick button{flex:1;padding:8px;border-radius:10px;border:2px solid var(--border);
+background:var(--bg);color:var(--muted);font-family:'Nunito',sans-serif;font-weight:800;
+font-size:.78rem;cursor:pointer;transition:all .15s;}
+.lunch-quick button:hover{color:var(--text);border-color:#cbd5e1;}
+.lunch-week-link{background:none;border:none;color:var(--dad);font-family:'Nunito',sans-serif;
+font-weight:800;font-size:.8rem;cursor:pointer;text-decoration:underline;padding:4px;align-self:flex-start;}
+
+/* Weekly lunch planner modal */
+.lw-nav{display:flex;align-items:center;justify-content:center;gap:10px;}
+.lw-nav .lw-label{font-family:'Fredoka One',cursive;font-size:.95rem;min-width:190px;text-align:center;}
+.lw-grid{display:grid;grid-template-columns:auto repeat(5,minmax(0,1fr));gap:5px;align-items:stretch;}
+.lw-head{font-size:.68rem;font-weight:800;color:var(--muted);text-transform:uppercase;
+letter-spacing:.04em;text-align:center;padding:5px 2px;border-radius:8px;background:none;
+border:none;font-family:'Nunito',sans-serif;cursor:pointer;line-height:1.3;transition:background .15s;}
+.lw-head:hover{background:var(--bg);}
+.lw-head span{display:block;font-size:.78rem;color:var(--text);}
+.lw-head.is-today span{color:var(--today-ring);}
+.lw-rowlabel{display:flex;align-items:center;padding-right:6px;font-weight:800;font-size:.82rem;
+background:none;border:none;font-family:'Nunito',sans-serif;cursor:pointer;white-space:nowrap;}
+.lw-rowlabel.charlotte{color:var(--charlotte-text);}
+.lw-rowlabel.alice{color:var(--alice-text);}
+.lw-cell{border:2px solid var(--border);background:var(--bg);border-radius:10px;min-height:46px;
+display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+cursor:pointer;transition:all .15s;font-family:'Nunito',sans-serif;padding:2px;}
+.lw-cell .lw-emoji{font-size:1.05rem;line-height:1;}
+.lw-cell .lw-cap{font-size:.55rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
+.lw-cell:hover:not(:disabled){border-color:var(--meal);}
+.lw-cell.home{background:var(--meal-lt);border-color:var(--meal);}
+.lw-cell.home .lw-cap{color:var(--meal-text);}
+.lw-cell:disabled{opacity:.35;cursor:default;}
+.lw-summary{font-size:.85rem;font-weight:800;color:var(--meal-text);background:var(--meal-lt);
+border-radius:10px;padding:10px 13px;line-height:1.45;}
+.lw-legend{font-size:.72rem;font-weight:700;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;}
+@media(max-width:700px){
+.lw-grid{gap:3px;}
+.lw-rowlabel{font-size:.7rem;}
+.lw-cell{min-height:40px;}
+}
+
 @media(max-width:700px){
 .cal-cell{min-height:70px;}
 .event-chip{font-size:.58rem;padding:2px 4px;}
@@ -456,6 +540,7 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
   </div>
   <button class="sync-btn" id="syncBtn">⚽🏫 Sync Feeds</button>
   <button class="meal-lib-btn" id="mealLibBtn">🍽️ Meal Library</button>
+  <button class="lunch-lib-btn" id="lunchWeekBtn">🥪 Lunches</button>
   <button class="refresh-btn" id="refreshBtn" title="Refresh from cloud">🔄</button>
   <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">🌙</button>
   <div class="legend" title="Tap a person to filter">
@@ -500,6 +585,7 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
   <div class="panel-tabs">
     <button class="panel-tab active" data-tab="events">📅 Events</button>
     <button class="panel-tab" data-tab="meal">🍽️ Dinner</button>
+    <button class="panel-tab" data-tab="lunch">🥪 Lunch</button>
   </div>
 
   <!-- Events tab -->
@@ -568,6 +654,41 @@ background:var(--bg);color:var(--muted);transition:all .15s;}
         </div>
       </div>
       <div class="meal-emoji-row" id="sideEmojiRow" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Lunch tab -->
+
+  <div class="panel-tab-content" id="tab-lunch">
+    <div class="lunch-panel" id="lunchPanel"></div>
+  </div>
+</div>
+
+<!-- ── WEEKLY LUNCH PLANNER MODAL ── -->
+
+<div class="modal-overlay" id="lunchModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🥪 Lunch Week</div>
+      <button class="btn-close" id="closeLunchModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="lw-nav">
+        <button class="btn-nav" id="lwPrev">◀</button>
+        <div class="lw-label" id="lwLabel"></div>
+        <button class="btn-nav" id="lwNext">▶</button>
+      </div>
+      <div class="lw-grid" id="lwGrid"></div>
+      <div class="lw-legend">
+        <span>🥪 Home lunch — pack it</span><span>🏫 School lunch</span><span>🚫 No school</span>
+      </div>
+      <div class="lw-summary" id="lwSummary"></div>
+    </div>
+    <div class="modal-footer">
+      <div class="lunch-quick">
+        <button id="lwAllHome">🥪 All home lunch</button>
+        <button id="lwAllSchool">🏫 All school lunch</button>
+      </div>
     </div>
   </div>
 </div>
@@ -696,6 +817,7 @@ let viewDay   = today.getDate();
 let viewMode  = localStorage.getItem('fam-view-mode') || 'month'; // 'week' | 'month' | 'quarter'
 let events    = {}; // "Y-M-D" → [{id,title,person,time,icon,location,uid,fromICS}]
 let meals     = {}; // "Y-M-D" → {id, mealId, name, icon, sides:[{id,name,icon}]}
+let lunches   = {}; // "Y-M-D" → {id, kids:['charlotte',…]}  — kids listed need a PACKED lunch
 let mealLib   = []; // [{id, name, icon, timesUsed, lastUsed}]
 let sideLib   = []; // [{id, name, icon, timesUsed, lastUsed}] (localStorage only)
 const ALL_PERSONS = ['dad','mom','charlotte','alice','family','school'];
@@ -921,6 +1043,102 @@ async function removeSideFromDay(key, sideId) {
     try { await db.from('meals').update({ sides: meals[key].sides }).eq('id', dbId); } catch(e){}
   }
   lsSet('fam-meals-v6', meals);
+}
+
+// ═══════════════════════════════════════════════
+// SUPABASE — SCHOOL LUNCHES
+// A day is only stored when someone needs a lunch packed, so "no row" means
+// "everyone's buying school lunch" — the quiet default. Needs a `lunches` table:
+//   create table lunches (
+//     id uuid primary key default gen_random_uuid(),
+//     calendar_id text not null, event_key text not null,
+//     kids jsonb not null default '[]', created_at timestamptz default now(),
+//     unique (calendar_id, event_key)
+//   );
+//   alter table lunches enable row level security;
+//   create policy "anon all" on lunches for all using (true) with check (true);
+// Until it exists the feature still works, saving to this device's localStorage only.
+// ═══════════════════════════════════════════════
+const LUNCH_KIDS = [
+  { key:'charlotte', name:'Charlotte' },
+  { key:'alice',     name:'Alice' }
+];
+const LUNCH_KID_KEYS = LUNCH_KIDS.map(k => k.key);
+let lunchTableOk = true; // flipped off if the table is missing, to stop retry spam
+
+function kidName(key){
+  const k = LUNCH_KIDS.find(k => k.key === key);
+  return k ? k.name : key;
+}
+function lunchKidsFor(key){
+  return (lunches[key] && lunches[key].kids) || [];
+}
+function needsHomeLunch(key, kid){
+  return lunchKidsFor(key).includes(kid);
+}
+
+async function loadLunches() {
+  const cached = lsGet('fam-lunches-v1') || {};
+  try {
+    const { data, error } = await db.from('lunches').select('*').eq('calendar_id', CALENDAR_ID);
+    if (error) throw error;
+    lunches = {};
+    for (const r of data) {
+      const kids = Array.isArray(r.kids) ? r.kids.filter(k => LUNCH_KID_KEYS.includes(k)) : [];
+      if (kids.length) lunches[r.event_key] = { id:r.id, kids };
+    }
+    // Keep cached days that never reached the DB. A day with a real DB id that is
+    // now missing was cleared on another device, so it stays cleared.
+    for (const [k, v] of Object.entries(cached)) {
+      if (!lunches[k] && v.kids && v.kids.length && !isDbId(v.id)) lunches[k] = v;
+    }
+    lunchTableOk = true;
+    lsSet('fam-lunches-v1', lunches);
+  } catch(e) {
+    console.warn('Lunches load failed — using this device only:', e.message);
+    lunches = cached;
+    lunchTableOk = false;
+  }
+}
+
+// Sets the full packed-lunch list for one day. Empty list = nobody packs = row removed.
+async function setLunchKids(key, kids) {
+  const ordered = LUNCH_KID_KEYS.filter(k => kids.includes(k));
+  const dbId = lunches[key] && lunches[key].id;
+  if (ordered.length) lunches[key] = { id:dbId, kids:ordered };
+  else delete lunches[key];
+  lsSet('fam-lunches-v1', lunches);
+  if (!lunchTableOk) return;
+  try {
+    if (!ordered.length) {
+      if (isDbId(dbId)) await db.from('lunches').delete().eq('id', dbId);
+    } else if (isDbId(dbId)) {
+      await db.from('lunches').update({ kids: ordered }).eq('id', dbId);
+    } else {
+      const { data, error } = await db.from('lunches')
+        .insert({ calendar_id:CALENDAR_ID, event_key:key, kids:ordered })
+        .select().single();
+      if (error) throw error;
+      lunches[key].id = data.id;
+      lsSet('fam-lunches-v1', lunches);
+    }
+  } catch(e) { console.warn('Save lunch failed:', e.message); }
+}
+
+async function toggleLunch(key, kid) {
+  const kids = lunchKidsFor(key).slice();
+  const i = kids.indexOf(kid);
+  if (i >= 0) kids.splice(i, 1); else kids.push(kid);
+  await setLunchKids(key, kids);
+}
+
+// Weekends and district closures need no lunch at all, so the UI stays out of the way.
+function isSchoolDay(y, m, d) {
+  const dow = new Date(y, m, d).getDay();
+  if (dow === 0 || dow === 6) return false;
+  const key = `${y}-${m}-${d}`;
+  return !(events[key] || []).some(e =>
+    e.person === 'school' && /no school|break|holiday|vacation/i.test(e.title));
 }
 
 // ═══════════════════════════════════════════════
@@ -1606,6 +1824,25 @@ function renderReminders(){
       <button class="btn-dismiss" onclick="this.parentElement.remove()">Got it! ✓</button>`;
     area.appendChild(div);
   }
+  renderLunchReminder(area);
+}
+
+// Packing happens the night before, so the banner covers today AND tomorrow.
+function renderLunchReminder(area){
+  const parts=[];
+  for(const[label,offset]of[['Today',0],['Tomorrow',1]]){
+    const d=new Date(today.getFullYear(),today.getMonth(),today.getDate()+offset);
+    const kids=lunchKidsFor(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`)
+      .filter(k=>activePersonFilter.has(k));
+    if(kids.length)parts.push(`<strong>${label}:</strong> ${kids.map(kidName).join(' & ')}`);
+  }
+  if(!parts.length)return;
+  const div=document.createElement('div');
+  div.className='reminder-banner lunch-banner';
+  div.innerHTML=`<span class="bell">🥪</span>
+    <div class="rem-text">${parts.join(' &nbsp;•&nbsp; ')} — home lunch to pack</div>
+    <button class="btn-dismiss" onclick="this.parentElement.remove()">Packed! ✓</button>`;
+  area.appendChild(div);
 }
 
 // ═══════════════════════════════════════════════
@@ -1742,6 +1979,16 @@ function buildDayCell(year,month,day,isCur,opts={}){
     more.className='more-chip';
     more.textContent=`+${sorted.length-MAX} more`;
     cell.appendChild(more);
+  }
+  const lunchKids=lunchKidsFor(key).filter(k=>activePersonFilter.has(k));
+  if(lunchKids.length){
+    const badge=document.createElement('div');
+    badge.className='lunch-badge';
+    badge.title=`Pack a home lunch: ${lunchKids.map(kidName).join(' & ')}`;
+    badge.innerHTML='<span class="lb-icon">🥪</span>'+lunchKids.map(k=>
+      `<span class="lb-kid ${k}">${detail?kidName(k):kidName(k)[0]}</span>`).join('');
+    badge.addEventListener('click',e=>{e.stopPropagation();openPanel(year,month,day,'lunch');});
+    cell.appendChild(badge);
   }
   cell.addEventListener('click',()=>openPanel(year,month,day,'events'));
   return cell;
@@ -1988,6 +2235,7 @@ function switchPanelTab(tab){
     document.getElementById('newTimeRow').style.display='';
   }
   if(tab==='meal')renderMealPicker(y,m,d);
+  if(tab==='lunch')renderLunchPanel(y,m,d);
 }
 
 document.querySelectorAll('.panel-tab').forEach(btn=>{
@@ -2059,6 +2307,209 @@ async function deleteAndRefresh(key,id,uid){
   await deleteEvent(key,id);
   renderCalendar();renderPanelBody(y,m,d);
 }
+
+// ═══════════════════════════════════════════════
+// SCHOOL LUNCH — day panel + weekly planner
+// A checked kid means "pack a home lunch". Unchecked (the default) means they're
+// buying school lunch, so the calendar only ever shows the days that need action.
+// ═══════════════════════════════════════════════
+function afterLunchChange(){
+  renderCalendar();
+  renderReminders();
+  if(document.getElementById('lunchModal').classList.contains('open'))renderLunchWeek();
+}
+
+function renderLunchPanel(y,m,d){
+  const wrap=document.getElementById('lunchPanel');
+  const key=`${y}-${m}-${d}`;
+  const school=isSchoolDay(y,m,d);
+  wrap.innerHTML='';
+
+  const note=document.createElement('div');
+  note.className='lunch-note';
+  note.innerHTML=school
+    ?'Check a kid to <strong>pack a home lunch</strong>. Left unchecked means they\'re buying school lunch.'
+    :'🎉 No school this day — nothing to pack.';
+  wrap.appendChild(note);
+
+  LUNCH_KIDS.forEach(kid=>{
+    const on=needsHomeLunch(key,kid.key);
+    const row=document.createElement('label');
+    row.className=`lunch-row ${kid.key}`+(on?' packed':'');
+    row.innerHTML=`<input type="checkbox"${on?' checked':''}>
+      <span class="lr-name">${kid.name}</span>
+      <span class="lr-state">${on?'🥪 Home lunch':'🏫 School lunch'}</span>`;
+    row.querySelector('input').addEventListener('change',async()=>{
+      await toggleLunch(key,kid.key);
+      renderLunchPanel(y,m,d);
+      afterLunchChange();
+    });
+    wrap.appendChild(row);
+  });
+
+  const quick=document.createElement('div');
+  quick.className='lunch-quick';
+  quick.innerHTML='<button data-all="home">🥪 Both home</button>'+
+                  '<button data-all="school">🏫 Both school</button>';
+  quick.querySelectorAll('button').forEach(b=>b.addEventListener('click',async()=>{
+    await setLunchKids(key,b.dataset.all==='home'?LUNCH_KID_KEYS.slice():[]);
+    renderLunchPanel(y,m,d);
+    afterLunchChange();
+  }));
+  wrap.appendChild(quick);
+
+  const link=document.createElement('button');
+  link.className='lunch-week-link';
+  link.textContent='🗓 Plan the whole week →';
+  link.addEventListener('click',()=>openLunchWeek(new Date(y,m,d)));
+  wrap.appendChild(link);
+
+  if(!lunchTableOk){
+    const warn=document.createElement('div');
+    warn.className='lunch-note';
+    warn.innerHTML='⚠️ Saving to this device only — the <strong>lunches</strong> table '+
+      'isn\'t set up in Supabase yet, so these won\'t sync to other phones.';
+    wrap.appendChild(warn);
+  }
+}
+
+// ── Weekly planner: rows = kids, columns = Mon–Fri ──
+let lunchWeekStart=null;
+const LUNCH_DOW=['Mon','Tue','Wed','Thu','Fri'];
+
+// Sunday maps forward to tomorrow's Monday — planning happens the night before.
+function schoolWeekStart(date){
+  const d=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+  const dow=d.getDay();
+  d.setDate(d.getDate()+(dow===0?1:1-dow));
+  return d;
+}
+
+function lunchWeekDays(){
+  const days=[];
+  for(let i=0;i<5;i++){
+    const d=new Date(lunchWeekStart);
+    d.setDate(lunchWeekStart.getDate()+i);
+    days.push(d);
+  }
+  return days;
+}
+
+function dayKeyOf(d){ return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
+
+function openLunchWeek(anchor){
+  lunchWeekStart=schoolWeekStart(anchor||new Date(viewYear,viewMonth,viewDay));
+  document.getElementById('lunchModal').classList.add('open');
+  renderLunchWeek();
+}
+
+function renderLunchWeek(){
+  const days=lunchWeekDays();
+  const a=days[0],z=days[4];
+  document.getElementById('lwLabel').textContent=
+    `${MONTHS[a.getMonth()].slice(0,3)} ${a.getDate()} – ${MONTHS[z.getMonth()].slice(0,3)} ${z.getDate()}`;
+
+  const grid=document.getElementById('lwGrid');
+  grid.innerHTML='';
+  grid.appendChild(document.createElement('div')); // corner spacer
+
+  const now=new Date();
+  days.forEach((d,i)=>{
+    const h=document.createElement('button');
+    h.className='lw-head'+(d.toDateString()===now.toDateString()?' is-today':'');
+    h.innerHTML=`${LUNCH_DOW[i]}<span>${d.getDate()}</span>`;
+    h.title='Toggle both kids for this day';
+    h.addEventListener('click',()=>toggleLunchDay(d));
+    grid.appendChild(h);
+  });
+
+  LUNCH_KIDS.forEach(kid=>{
+    const lbl=document.createElement('button');
+    lbl.className=`lw-rowlabel ${kid.key}`;
+    lbl.textContent=kid.name;
+    lbl.title=`Toggle ${kid.name}'s whole week`;
+    lbl.addEventListener('click',()=>toggleLunchWeekForKid(kid.key));
+    grid.appendChild(lbl);
+
+    days.forEach(d=>{
+      const key=dayKeyOf(d);
+      const school=isSchoolDay(d.getFullYear(),d.getMonth(),d.getDate());
+      const on=needsHomeLunch(key,kid.key);
+      const btn=document.createElement('button');
+      btn.className='lw-cell'+(on?' home':'');
+      btn.disabled=!school&&!on;
+      btn.innerHTML=(school||on)
+        ?`<span class="lw-emoji">${on?'🥪':'🏫'}</span><span class="lw-cap">${on?'Home':'School'}</span>`
+        :'<span class="lw-emoji">🚫</span>';
+      btn.title=school
+        ?`${kid.name} — ${d.toLocaleDateString('en-US',{weekday:'long'})}`
+        :'No school';
+      btn.addEventListener('click',async()=>{
+        await toggleLunch(key,kid.key);
+        afterLunchChange();
+      });
+      grid.appendChild(btn);
+    });
+  });
+
+  let total=0;
+  const perKid={};
+  days.forEach(d=>lunchKidsFor(dayKeyOf(d)).forEach(k=>{
+    total++; perKid[k]=(perKid[k]||0)+1;
+  }));
+  document.getElementById('lwSummary').innerHTML=total
+    ?`🥪 <strong>${total}</strong> home lunch${total===1?'':'es'} to pack this week — `+
+      LUNCH_KIDS.map(k=>`${k.name} ${perKid[k.key]||0}`).join(' · ')
+    :'🏫 No home lunches this week — everyone\'s buying.';
+}
+
+async function toggleLunchDay(d){
+  const key=dayKeyOf(d);
+  const any=lunchKidsFor(key).length>0;
+  if(!any&&!isSchoolDay(d.getFullYear(),d.getMonth(),d.getDate()))return;
+  await setLunchKids(key,any?[]:LUNCH_KID_KEYS.slice());
+  afterLunchChange();
+}
+
+async function toggleLunchWeekForKid(kid){
+  const days=lunchWeekDays();
+  const clearing=days.some(d=>needsHomeLunch(dayKeyOf(d),kid));
+  for(const d of days){
+    const key=dayKeyOf(d);
+    const on=needsHomeLunch(key,kid);
+    if(clearing){
+      if(on)await setLunchKids(key,lunchKidsFor(key).filter(k=>k!==kid));
+    }else if(!on&&isSchoolDay(d.getFullYear(),d.getMonth(),d.getDate())){
+      await setLunchKids(key,lunchKidsFor(key).concat(kid));
+    }
+  }
+  afterLunchChange();
+}
+
+async function setWholeLunchWeek(allHome){
+  for(const d of lunchWeekDays()){
+    if(allHome&&!isSchoolDay(d.getFullYear(),d.getMonth(),d.getDate()))continue;
+    await setLunchKids(dayKeyOf(d),allHome?LUNCH_KID_KEYS.slice():[]);
+  }
+  afterLunchChange();
+}
+
+document.getElementById('lunchWeekBtn').addEventListener('click',()=>openLunchWeek());
+document.getElementById('closeLunchModal').addEventListener('click',()=>{
+  document.getElementById('lunchModal').classList.remove('open');
+});
+document.getElementById('lunchModal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('lunchModal'))
+    document.getElementById('lunchModal').classList.remove('open');
+});
+document.getElementById('lwPrev').addEventListener('click',()=>{
+  lunchWeekStart.setDate(lunchWeekStart.getDate()-7);renderLunchWeek();
+});
+document.getElementById('lwNext').addEventListener('click',()=>{
+  lunchWeekStart.setDate(lunchWeekStart.getDate()+7);renderLunchWeek();
+});
+document.getElementById('lwAllHome').addEventListener('click',()=>setWholeLunchWeek(true));
+document.getElementById('lwAllSchool').addEventListener('click',()=>setWholeLunchWeek(false));
 
 // ═══════════════════════════════════════════════
 // MEAL PICKER (in side panel)
@@ -2708,7 +3159,7 @@ async function refreshAll(){
   if (btn.classList.contains('spinning')) return;
   btn.classList.add('spinning');
   try {
-    await Promise.all([loadEvents(), loadMeals(), loadMealLib(), loadSideLib()]);
+    await Promise.all([loadEvents(), loadMeals(), loadMealLib(), loadSideLib(), loadLunches()]);
     renderCalendar();
     renderReminders();
     const p = document.getElementById('sidePanel');
@@ -2777,7 +3228,7 @@ document.querySelectorAll('.view-mode-btn').forEach(btn=>{
 // BOOT
 // ═══════════════════════════════════════════════
 async function init(){
-  await Promise.all([loadEvents(), loadMeals(), loadMealLib(), loadSideLib()]);
+  await Promise.all([loadEvents(), loadMeals(), loadMealLib(), loadSideLib(), loadLunches()]);
   backfillIconsFromName();
   await cleanupSeedData();
   if(Object.keys(events).length===0){
