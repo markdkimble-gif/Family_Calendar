@@ -821,17 +821,19 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ═══════════════════════════════════════════════
 // ICS FEEDS
 // ═══════════════════════════════════════════════
+// `file` is a same-origin copy that .github/workflows/feeds.yml refreshes hourly —
+// the feed hosts don't send CORS headers and the public proxies are unreliable.
 const ICS_FEEDS = [
   { url:'https://calendar.playmetrics.com/calendars/c593/t584818/p0/t5D579B8A/f/calendar.ics',
-    person:'charlotte', label:'Charlotte soccer',
+    person:'charlotte', label:'Charlotte soccer', file:'feeds/charlotte.ics',
     clean:s=>s.replace(/^(?:CANCELED\s+)?North Surf G2013\/14 Royal\s*[-–]\s*/i,'').trim() },
   { url:'https://calendar.playmetrics.com/calendars/c593/t584718/p0/t3B8CF5DB/f/calendar.ics',
-    person:'alice',     label:'Alice soccer',
+    person:'alice',     label:'Alice soccer',     file:'feeds/alice.ics',
     clean:s=>s.replace(/^(?:CANCELED\s+)?North Surf G2016\/17 Royal\s*[-–]\s*/i,'').trim() },
   // Mounds View district calendar (calendar_ids=44) — all-day closure/term-boundary
   // notices only, so no venue lookup, no jersey, and its own icon set.
   { url:'https://www.mvpschools.org/fs/calendar-manager/events.ics?calendar_ids=44',
-    person:'school',    label:'School district', noVenue:true, icon:schoolIcon,
+    person:'school',    label:'School district',  file:'feeds/school.ics', noVenue:true, icon:schoolIcon,
     clean:s=>s.trim().replace(/\s{2,}/g,' ').replace(/^no school/i,'No School') }
 ];
 const PROXY = 'https://api.allorigins.win/raw?url=';
@@ -976,9 +978,11 @@ async function deleteEvent(key, evId) {
   lsSet('fam-events-v6', events);
 }
 
-async function clearICSFromDB() {
-  try { await db.from('events').delete().eq('calendar_id',CALENDAR_ID).eq('from_ics',true); } catch(e){}
-  for (const k of Object.keys(events)) events[k] = events[k].filter(e=>!e.fromICS);
+// Only the feeds that were just fetched get cleared, so a feed that fails to
+// download keeps its existing events instead of vanishing from the calendar.
+async function clearICSFromDB(persons) {
+  try { await db.from('events').delete().eq('calendar_id',CALENDAR_ID).eq('from_ics',true).in('person',persons); } catch(e){}
+  for (const k of Object.keys(events)) events[k] = events[k].filter(e=>!(e.fromICS&&persons.includes(e.person)));
 }
 
 // ═══════════════════════════════════════════════
@@ -1678,12 +1682,21 @@ async function syncICS() {
   btn.classList.add('syncing'); btn.textContent='⟳ Syncing…';
   bar.classList.remove('hidden'); msg.textContent='Fetching calendar feeds…';
   try {
-    await clearICSFromDB();
     let total=0;
     const perFeed=[];
     const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-    const fetchFeed=async(url)=>{
+    const fetchFeed=async(url,file)=>{
       const errors=[];
+      if(file){
+        try {
+          const res=await fetch(file,{cache:'no-store'});
+          if(res.ok){
+            const text=await res.text();
+            if(text.includes('BEGIN:VEVENT'))return text;
+            errors.push(`${file}: no VEVENTs`);
+          } else errors.push(`${file}: HTTP ${res.status}`);
+        } catch(e) { errors.push(`${file}: ${e.message}`); }
+      }
       // The public proxies return intermittent 5xx, so make two full passes
       // before declaring a feed dead — one bad round shouldn't drop a schedule.
       for (let attempt=0; attempt<2; attempt++) {
@@ -1715,14 +1728,18 @@ async function syncICS() {
       const name=feed.label||feed.person;
       msg.textContent=`Fetching ${name}…`;
       try {
-        const text=await fetchFeed(feed.url);
+        const text=await fetchFeed(feed.url,feed.file);
         parsed.push({feed, vevents:parseICS(text)});
       } catch(feedErr) {
         perFeed.push(`${name}: FAILED`);
         console.warn(`❌ ${name} feed failed:`, feedErr.message);
       }
     }
-    // Phase 2: build address→venue map from all parsed events
+    if(!parsed.length)throw new Error('every feed failed to download');
+    // Phase 2: swap out only the feeds we actually got, then build the
+    // address→venue map from all parsed events
+    const synced=parsed.map(p=>p.feed.person);
+    await clearICSFromDB(synced);
     const venueMap=buildVenueMap(parsed.flatMap(p=>p.vevents));
     // Phase 3: ingest using the shared venue map
     for(const {feed, vevents} of parsed){
@@ -1744,7 +1761,7 @@ async function syncICS() {
     const rows=[];
     for(const[key,evList]of Object.entries(events))
       for(const ev of evList)
-        if(ev.fromICS)rows.push({calendar_id:CALENDAR_ID,event_key:key,title:ev.title,
+        if(ev.fromICS&&synced.includes(ev.person))rows.push({calendar_id:CALENDAR_ID,event_key:key,title:ev.title,
           person:ev.person,time:ev.time||'',icon:ev.icon||'',location:ev.location||'',
           jersey:ev.jersey||'',uid:ev.uid||'',from_ics:true});
     let schoolCloudFail=false;

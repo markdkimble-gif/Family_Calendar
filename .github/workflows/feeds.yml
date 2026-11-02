@@ -1,0 +1,43 @@
+# Mirror the calendar feeds into feeds/ so the page can read them same-origin.
+# Playmetrics and the school district don't send CORS headers, and the public
+# CORS proxies the page used to rely on have shut down or stopped responding.
+name: Refresh calendar feeds
+
+on:
+  schedule:
+    - cron: '17 * * * *'   # hourly; Playmetrics publishes with a 1h TTL
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download feeds
+        run: |
+          set -u
+          fetch() {
+            # Only overwrite on a real calendar, so an outage keeps the last good copy.
+            if curl -fsSL --retry 3 --max-time 60 "$2" -o "/tmp/$1" && grep -q 'BEGIN:VEVENT' "/tmp/$1"; then
+              mv "/tmp/$1" "feeds/$1"
+            else
+              echo "::warning::$1 download failed; keeping previous copy"
+            fi
+          }
+          mkdir -p feeds
+          fetch charlotte.ics 'https://calendar.playmetrics.com/calendars/c593/t584818/p0/t5D579B8A/f/calendar.ics'
+          fetch alice.ics     'https://calendar.playmetrics.com/calendars/c593/t584718/p0/t3B8CF5DB/f/calendar.ics'
+          fetch school.ics    'https://www.mvpschools.org/fs/calendar-manager/events.ics?calendar_ids=44'
+
+      - name: Commit if changed
+        run: |
+          git add feeds
+          if git diff --cached --quiet; then echo "No feed changes"; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Refresh calendar feeds'
+          git push
