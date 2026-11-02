@@ -66,6 +66,10 @@ transition:all .15s;display:flex;align-items:center;gap:5px;}
 padding:5px 13px;font-family:'Nunito',sans-serif;font-weight:700;font-size:.8rem;cursor:pointer;
 transition:all .15s;display:flex;align-items:center;gap:5px;}
 .meal-lib-btn:hover{background:var(--meal);color:#fff;}
+.hidden-btn{background:var(--bg);color:var(--muted);border:2px dashed var(--border);border-radius:20px;
+padding:5px 13px;font-family:'Nunito',sans-serif;font-weight:700;font-size:.8rem;cursor:pointer;
+transition:all .15s;display:flex;align-items:center;gap:5px;}
+.hidden-btn:hover{color:var(--text);border-color:var(--muted);}
 .theme-toggle,.refresh-btn{background:var(--bg);border:2px solid var(--border);border-radius:50%;
 width:32px;height:32px;font-size:.95rem;cursor:pointer;color:var(--text);display:flex;align-items:center;
 justify-content:center;transition:background .15s;}
@@ -424,6 +428,19 @@ padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.86re
 font-size:.78rem;cursor:pointer;border:2px solid var(--border);background:var(--bg);
 color:var(--muted);transition:all .15s;}
 .tab-pill.active{background:var(--meal);color:#fff;border-color:var(--meal);}
+/* Hidden synced-event manager */
+.hid-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:11px;
+background:var(--bg);border:2px solid var(--border);}
+.hid-row .hid-icon{font-size:1.15rem;flex-shrink:0;}
+.hid-info{flex:1;min-width:0;}
+.hid-title{font-weight:800;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hid-sub{font-size:.75rem;color:var(--muted);font-weight:600;}
+.hid-restore{background:var(--family-lt);color:var(--family-text);border:2px solid var(--family);
+border-radius:9px;padding:5px 11px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.78rem;
+cursor:pointer;flex-shrink:0;}
+.hid-restore:hover{background:var(--family);color:#fff;}
+.hid-note{font-size:.78rem;color:var(--muted);font-weight:600;line-height:1.45;}
+
 .lib-type-toggle{display:flex;gap:6px;margin-bottom:8px;}
 .lib-type-btn{flex:1;padding:8px 12px;border-radius:10px;font-family:'Nunito',sans-serif;
 font-weight:800;font-size:.88rem;cursor:pointer;border:2px solid var(--border);
@@ -539,6 +556,7 @@ border-radius:10px;padding:10px 13px;line-height:1.45;}
     <button class="view-mode-btn" data-mode="quarter">3 Months</button>
   </div>
   <button class="sync-btn" id="syncBtn">⚽🏫 Sync Feeds</button>
+  <button class="hidden-btn" id="hiddenBtn" style="display:none;" title="Synced events you deleted">🚫 Hidden <span id="hiddenCount">0</span></button>
   <button class="meal-lib-btn" id="mealLibBtn">🍽️ Meal Library</button>
   <button class="lunch-lib-btn" id="lunchWeekBtn">🥪 Lunches</button>
   <button class="refresh-btn" id="refreshBtn" title="Refresh from cloud">🔄</button>
@@ -719,6 +737,22 @@ border-radius:10px;padding:10px 13px;line-height:1.45;}
         <input type="text" id="libMealName" placeholder="Add new meal to library…">
         <button class="lib-add-btn" id="libAddBtn">+ Add</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── HIDDEN SYNCED EVENTS MODAL ── -->
+
+<div class="modal-overlay" id="hiddenModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🚫 Hidden Synced Events</div>
+      <button class="btn-close" id="closeHiddenModal">✕</button>
+    </div>
+    <div class="modal-body" id="hiddenModalBody"></div>
+    <div class="modal-footer">
+      <div class="hid-note">These come from the soccer &amp; school feeds. Hidden events stay gone
+      through every sync — restore one and it comes back on the next feed sync.</div>
     </div>
   </div>
 </div>
@@ -917,6 +951,8 @@ async function loadEvents() {
     }
   }
   if (migrated) lsSet('fam-events-v6', events);
+  // Another device may have re-synced a feed event we've hidden here.
+  if (applyHiddenToEvents()) lsSet('fam-events-v6', events);
 }
 
 async function saveEvent(key, ev) {
@@ -943,6 +979,126 @@ async function deleteEvent(key, evId) {
 async function clearICSFromDB() {
   try { await db.from('events').delete().eq('calendar_id',CALENDAR_ID).eq('from_ics',true); } catch(e){}
   for (const k of Object.keys(events)) events[k] = events[k].filter(e=>!e.fromICS);
+}
+
+// ═══════════════════════════════════════════════
+// SUPABASE — HIDDEN ICS EVENTS
+// Every sync wipes and re-ingests the feeds, so deleting a synced event has to be
+// remembered separately or it just comes back. Playmetrics placeholders that are
+// never cleaned up in the soccer app are the reason this exists.
+//
+// Needs a table (falls back to this device's localStorage if it's missing):
+//   create table hidden_ics (
+//     id uuid primary key default gen_random_uuid(),
+//     calendar_id text not null,
+//     event_key   text not null,
+//     uid  text default '', title text default '',
+//     time text default '', person text default '',
+//     created_at timestamptz default now()
+//   );
+//   alter table hidden_ics enable row level security;
+//   create policy hidden_ics_all on hidden_ics for all using (true) with check (true);
+// ═══════════════════════════════════════════════
+let hiddenICS = new Map(); // fingerprint → {id,key,uid,title,time,person}
+let hiddenCloudOK = true;  // false once we learn the table isn't there
+
+// Date + uid + title + time. Deliberately specific: if the placeholder is later
+// edited in the feed (moved to a real time or day) it reappears rather than
+// staying silently hidden — re-hiding is cheap, a missed real game isn't.
+function icsFp(key, ev) {
+  return [key, ev.uid||'', ev.title||'', ev.time||''].join('|');
+}
+
+async function loadHiddenICS() {
+  const cached = lsGet('fam-hidden-ics-v1') || [];
+  const fromRecs = recs => {
+    const m = new Map();
+    for (const r of recs) m.set(icsFp(r.key, r), r);
+    return m;
+  };
+  try {
+    const { data, error } = await db.from('hidden_ics').select('*').eq('calendar_id', CALENDAR_ID);
+    if (error) throw error;
+    hiddenCloudOK = true;
+    hiddenICS = fromRecs(data.map(r => ({ id:r.id, key:r.event_key, uid:r.uid||'',
+      title:r.title||'', time:r.time||'', person:r.person||'' })));
+    // Anything hidden on this device that never reached the cloud — push it up.
+    for (const r of cached) {
+      const fp = icsFp(r.key, r);
+      if (!hiddenICS.has(fp)) { hiddenICS.set(fp, r); insertHiddenRow(r); }
+    }
+  } catch(e) {
+    hiddenCloudOK = false;
+    hiddenICS = fromRecs(cached);
+    console.warn('hidden_ics table unavailable — hidden events are local to this device. '
+      + 'See the SQL in the HIDDEN ICS EVENTS section of index.html. Details:', e.message);
+  }
+  lsSet('fam-hidden-ics-v1', [...hiddenICS.values()]);
+}
+
+async function insertHiddenRow(rec) {
+  if (!hiddenCloudOK) return;
+  try {
+    const { data, error } = await db.from('hidden_ics').insert({
+      calendar_id:CALENDAR_ID, event_key:rec.key, uid:rec.uid||'',
+      title:rec.title||'', time:rec.time||'', person:rec.person||''
+    }).select().single();
+    if (error) throw error;
+    rec.id = data.id;
+  } catch(e) { hiddenCloudOK = false; console.warn('Hide not saved to cloud:', e.message); }
+}
+
+// Drop every hidden event out of `events`. Cheap, so it runs after each load and
+// after each sync ingest — whichever path put the event back.
+function applyHiddenToEvents() {
+  if (!hiddenICS.size) return 0;
+  let removed = 0;
+  for (const k of Object.keys(events)) {
+    const before = events[k].length;
+    events[k] = events[k].filter(ev => !(ev.fromICS && hiddenICS.has(icsFp(k, ev))));
+    removed += before - events[k].length;
+  }
+  return removed;
+}
+
+// Hide one synced event: remember it, then drop the row it came from.
+async function hideICSEvent(key, ev) {
+  const rec = { key, uid:ev.uid||'', title:ev.title||'', time:ev.time||'', person:ev.person||'' };
+  hiddenICS.set(icsFp(key, ev), rec);
+  events[key] = (events[key]||[]).filter(e => e !== ev);
+  lsSet('fam-events-v6', events);
+  lsSet('fam-hidden-ics-v1', [...hiddenICS.values()]);
+  await insertHiddenRow(rec);
+  try {
+    // Straight after a sync the in-memory copies have no DB id yet, so fall back
+    // to matching the row on the same fields the fingerprint uses.
+    if (ev.id && isDbId(ev.id)) {
+      await db.from('events').delete().eq('id', ev.id);
+    } else {
+      await db.from('events').delete().eq('calendar_id',CALENDAR_ID).eq('event_key',key)
+        .eq('from_ics',true).eq('uid',ev.uid||'').eq('title',ev.title||'');
+    }
+  } catch(e) { console.warn('Hidden event not removed from cloud:', e.message); }
+  updateHiddenBtn();
+}
+
+async function unhideICS(fp) {
+  const rec = hiddenICS.get(fp);
+  if (!rec) return;
+  hiddenICS.delete(fp);
+  lsSet('fam-hidden-ics-v1', [...hiddenICS.values()]);
+  if (rec.id && hiddenCloudOK) {
+    try { await db.from('hidden_ics').delete().eq('id', rec.id); }
+    catch(e) { console.warn('Restore not saved to cloud:', e.message); }
+  }
+  updateHiddenBtn();
+}
+
+function updateHiddenBtn() {
+  const btn = document.getElementById('hiddenBtn');
+  if (!btn) return;
+  btn.style.display = hiddenICS.size ? 'flex' : 'none';
+  document.getElementById('hiddenCount').textContent = hiddenICS.size;
 }
 
 // ═══════════════════════════════════════════════
@@ -1366,17 +1522,30 @@ function parseICS(text) {
     const c=line.indexOf(':'); if(c===-1)continue;
     const k=line.slice(0,c).split(';')[0].toUpperCase();
     const v=line.slice(c+1).replace(/\\,/g,',').replace(/\\;/g,';').replace(/\\n/g,'\n').replace(/\\/g,'').trim();
-    if(k==='SUMMARY')cur.summary=v; if(k==='DTSTART')cur.dtstart=line.slice(c+1).trim();
-    if(k==='DTEND')cur.dtend=line.slice(c+1).trim(); if(k==='LOCATION')cur.location=v;
+    // Dates keep their parameters (";TZID=UTC:2026…") so parseDT can tell UTC from local.
+    if(k==='SUMMARY')cur.summary=v; if(k==='DTSTART')cur.dtstart=line.slice(k.length).trim();
+    if(k==='DTEND')cur.dtend=line.slice(k.length).trim(); if(k==='LOCATION')cur.location=v;
     if(k==='DESCRIPTION')cur.description=v;
     if(k==='STATUS')cur.status=v; if(k==='UID')cur.uid=v;
   }
   return out;
 }
 
+// Playmetrics stamps every time as UTC (";TZID=UTC:" or a trailing "Z"), so convert
+// those to home time explicitly — not the device's zone, which may be travelling.
+const HOME_TZ='America/Chicago';
+const homeParts=new Intl.DateTimeFormat('en-US',{timeZone:HOME_TZ,hourCycle:'h23',
+  year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
 function parseDT(s) {
-  const r=(s.includes(':')?s.split(':').pop():s).replace(/Z$/,'');
+  const raw=s.includes(':')?s.split(':').pop():s;
+  const r=raw.replace(/Z$/,'');
   if(r.length===8)return{y:+r.slice(0,4),m:+r.slice(4,6)-1,d:+r.slice(6,8),time:null,allDay:true};
+  const isUTC=/Z$/.test(raw)||/;TZID=(?:UTC|Etc\/UTC|GMT|Z)(?:;|:)/i.test(';'+s);
+  if(isUTC){
+    const utc=new Date(Date.UTC(+r.slice(0,4),+r.slice(4,6)-1,+r.slice(6,8),+r.slice(9,11),+r.slice(11,13)));
+    const p=Object.fromEntries(homeParts.formatToParts(utc).map(x=>[x.type,x.value]));
+    return{y:+p.year,m:+p.month-1,d:+p.day,time:`${p.hour}:${p.minute}`,allDay:false};
+  }
   return{y:+r.slice(0,4),m:+r.slice(4,6)-1,d:+r.slice(6,8),time:r.slice(9,11)+':'+r.slice(11,13),allDay:false};
 }
 
@@ -1568,6 +1737,10 @@ async function syncICS() {
         console.warn(`❌ ${name} feed failed:`, feedErr.message);
       }
     }
+    // Feeds keep re-serving events we've deliberately deleted (stale Playmetrics
+    // placeholders), so drop them before anything is written back.
+    const hiddenDropped=applyHiddenToEvents();
+    total-=hiddenDropped;
     const rows=[];
     for(const[key,evList]of Object.entries(events))
       for(const ev of evList)
@@ -1599,6 +1772,7 @@ async function syncICS() {
     lsSet('fam-events-v6',events);
     renderCalendar(); renderReminders();
     msg.textContent=`✅ Synced ${total} events (${perFeed.join(', ')})`
+      +(hiddenDropped?` · 🚫 ${hiddenDropped} hidden`:'')
       +(schoolCloudFail?' — ⚠️ school events local only, see console':'');
     setTimeout(()=>bar.classList.add('hidden'),6000);
   } catch(e){
@@ -2285,11 +2459,37 @@ function mkEvent(ev,key){
       +`<button class="ev-edit" title="Edit" onclick="openEditEvent('${key}','${ev.id}')">✏️</button>`
       +`<button class="ev-del" title="Delete" onclick="deleteAndRefresh('${key}','${ev.id}','${ev.uid||''}')">✕</button>`
       +`</span>`;
+  }else if(ev.fromICS){
+    // Synced events can't be edited (the feed owns them) but they can be deleted —
+    // stale placeholders live on in the soccer app forever otherwise.
+    actions=`<span class="ev-actions"><button class="ev-del" title="Delete this synced event">✕</button></span>`;
   }
   el.innerHTML=`<div class="icon">${ev.icon||'📌'}</div>
     <div class="info"><div class="ev-title">${ev.title}${actions}</div>
     <div class="ev-sub">${ev.time||''}</div>${multiInfo}${loc}${kit}</div>`;
+  // Titles can contain quotes, so the ICS button gets a real listener over the
+  // event object rather than an interpolated onclick.
+  if(ev.fromICS){
+    const btn=el.querySelector('.ev-del');
+    if(btn)btn.addEventListener('click',()=>hideAndRefresh(key,ev));
+  }
   return el;
+}
+
+// Deleting a synced event hides it permanently — see hideICSEvent.
+async function hideAndRefresh(key,ev){
+  const panel=document.getElementById('sidePanel');
+  const y=+panel.dataset.y,m=+panel.dataset.m,d=+panel.dataset.d;
+  let targets=[{key,ev}];
+  if(ev.uid&&ev.uid.startsWith('multi-')){
+    const group=getMultiDayGroup(ev.uid);
+    if(group.length>1)targets=group;
+  }
+  const span=targets.length>1?` (all ${targets.length} days)`:'';
+  if(!confirm(`Delete the synced event "${ev.title}"${span}?\n\n`
+    +`It stays deleted through future syncs. Restore it any time from 🚫 Hidden in the header.`))return;
+  for(const t of targets)await hideICSEvent(t.key,t.ev);
+  renderCalendar();renderReminders();renderPanelBody(y,m,d);
 }
 
 async function deleteAndRefresh(key,id,uid){
@@ -2813,6 +3013,76 @@ document.getElementById('mealModal').addEventListener('click',e=>{
     document.getElementById('mealModal').classList.remove('open');
 });
 
+// ═══════════════════════════════════════════════
+// HIDDEN SYNCED EVENTS MODAL
+// ═══════════════════════════════════════════════
+let restoredSinceOpen=false;
+
+function hiddenKeyDate(key){
+  const[y,m,d]=key.split('-').map(Number);
+  if(!Number.isFinite(y))return key;
+  return new Date(y,m,d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+}
+
+function renderHiddenModal(){
+  const body=document.getElementById('hiddenModalBody');
+  body.innerHTML='';
+  if(!hiddenCloudOK){
+    const warn=document.createElement('div');warn.className='hid-note';
+    warn.innerHTML='⚠️ <b>This device only.</b> The <code>hidden_ics</code> table isn\'t in Supabase yet, '
+      +'so deletions won\'t follow you to the phone or tablet. The SQL to add it is in the '
+      +'HIDDEN ICS EVENTS comment in index.html.';
+    body.appendChild(warn);
+  }
+  if(!hiddenICS.size){
+    const empty=document.createElement('div');empty.className='empty-day';
+    empty.textContent='Nothing hidden — the calendar shows every synced event. 🌤️';
+    body.appendChild(empty);
+    return;
+  }
+  const rows=[...hiddenICS.entries()].sort((a,b)=>{
+    const d=(s)=>{const[y,m,dd]=s.split('-').map(Number);return new Date(y,m,dd);};
+    return d(a[1].key)-d(b[1].key);
+  });
+  for(const[fp,rec]of rows){
+    const row=document.createElement('div');row.className='hid-row';
+    const icon=document.createElement('div');icon.className='hid-icon';
+    icon.textContent=PERSON_ICONS[rec.person]||'📌';
+    const info=document.createElement('div');info.className='hid-info';
+    const t=document.createElement('div');t.className='hid-title';t.textContent=rec.title||'(untitled)';
+    const s=document.createElement('div');s.className='hid-sub';
+    s.textContent=hiddenKeyDate(rec.key)+(rec.time?` · ${rec.time}`:'');
+    info.appendChild(t);info.appendChild(s);
+    const btn=document.createElement('button');btn.className='hid-restore';btn.textContent='↺ Restore';
+    btn.addEventListener('click',async()=>{
+      await unhideICS(fp);
+      restoredSinceOpen=true;
+      renderHiddenModal();
+    });
+    row.appendChild(icon);row.appendChild(info);row.appendChild(btn);
+    body.appendChild(row);
+  }
+}
+
+function openHiddenModal(){
+  restoredSinceOpen=false;
+  document.getElementById('hiddenModal').classList.add('open');
+  renderHiddenModal();
+}
+
+// A restored event only actually returns when the feed is read again, so re-sync
+// on the way out instead of leaving the calendar looking unchanged.
+function closeHiddenModal(){
+  document.getElementById('hiddenModal').classList.remove('open');
+  if(restoredSinceOpen){restoredSinceOpen=false;syncICS();}
+}
+
+document.getElementById('hiddenBtn').addEventListener('click',openHiddenModal);
+document.getElementById('closeHiddenModal').addEventListener('click',closeHiddenModal);
+document.getElementById('hiddenModal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('hiddenModal'))closeHiddenModal();
+});
+
 document.querySelectorAll('[data-mtab]').forEach(btn=>{
   btn.addEventListener('click',()=>{
     currentMTab=btn.dataset.mtab;
@@ -3159,7 +3429,9 @@ async function refreshAll(){
   if (btn.classList.contains('spinning')) return;
   btn.classList.add('spinning');
   try {
+    await loadHiddenICS(); // before events, so hidden ones never flash back in
     await Promise.all([loadEvents(), loadMeals(), loadMealLib(), loadSideLib(), loadLunches()]);
+    updateHiddenBtn();
     renderCalendar();
     renderReminders();
     const p = document.getElementById('sidePanel');
@@ -3228,7 +3500,9 @@ document.querySelectorAll('.view-mode-btn').forEach(btn=>{
 // BOOT
 // ═══════════════════════════════════════════════
 async function init(){
+  await loadHiddenICS(); // before events, so hidden ones never flash back in
   await Promise.all([loadEvents(), loadMeals(), loadMealLib(), loadSideLib(), loadLunches()]);
+  updateHiddenBtn();
   backfillIconsFromName();
   await cleanupSeedData();
   if(Object.keys(events).length===0){
