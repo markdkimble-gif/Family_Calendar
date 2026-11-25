@@ -532,6 +532,77 @@ border-radius:10px;padding:10px 13px;line-height:1.45;}
 .lw-cell{min-height:40px;}
 }
 
+/* ── WORKOUT CHALLENGE (Spring Break 50) ── */
+.wo-lib-btn{background:var(--family-lt);color:var(--family-text);border:2px solid var(--family);border-radius:20px;
+padding:5px 13px;font-family:'Nunito',sans-serif;font-weight:700;font-size:.8rem;cursor:pointer;
+transition:all .15s;display:flex;align-items:center;gap:5px;}
+.wo-lib-btn:hover{background:var(--family);color:#fff;}
+.reminder-banner.wo-banner{background:linear-gradient(135deg,#0ea5e9,#10b981);color:#fff;cursor:pointer;align-items:center;}
+.wo-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;}
+.wo-head{font-size:.84rem;font-weight:700;}
+.wo-head strong{font-size:.92rem;font-weight:900;}
+.wo-rows{display:flex;flex-wrap:wrap;gap:6px 18px;}
+.wo-row{display:flex;align-items:center;gap:8px;flex:1 1 260px;min-width:0;}
+.wo-name{font-weight:900;font-size:.82rem;width:34px;flex-shrink:0;}
+.wo-bar{flex:1;height:10px;border-radius:6px;background:rgba(255,255,255,.3);overflow:hidden;min-width:60px;}
+.wo-bar>div{height:100%;border-radius:6px;background:#fff;transition:width .3s;}
+.wo-count{font-weight:900;font-size:.82rem;white-space:nowrap;}
+.wo-pace{font-size:.68rem;font-weight:800;padding:2px 7px;border-radius:8px;background:rgba(255,255,255,.22);white-space:nowrap;}
+.wo-pace.behind{background:rgba(127,29,29,.45);}
+.wo-plus{border:2px solid #fff;background:rgba(255,255,255,.15);color:#fff;border-radius:10px;
+padding:3px 9px;font-family:'Nunito',sans-serif;font-weight:900;font-size:.8rem;cursor:pointer;white-space:nowrap;
+transition:all .15s;flex-shrink:0;}
+.wo-plus:hover{background:#fff;color:#0f766e;}
+.wo-plus.done{background:#fff;color:#0f766e;}
+
+.wo-badge{margin-top:auto;align-self:flex-start;display:flex;align-items:center;gap:3px;
+padding:2px 4px;border-radius:8px;cursor:pointer;transition:background .15s;}
+.lunch-badge+.wo-badge{margin-top:2px;}
+.wo-badge:hover{background:var(--family-lt);}
+.wo-badge .wb-icon{font-size:.72rem;line-height:1;}
+.wo-badge .wb-p{font-size:.6rem;font-weight:800;line-height:1;padding:1px 5px;border-radius:6px;}
+.wo-badge .wb-p.dad{background:var(--dad-lt);color:var(--dad-text);}
+.wo-badge .wb-p.mom{background:var(--mom-lt);color:var(--mom-text);}
+.cal-grid.week-view .wo-badge{margin-top:4px;padding:5px 9px;gap:5px;}
+.cal-grid.week-view .wo-badge .wb-icon{font-size:1rem;}
+.cal-grid.week-view .wo-badge .wb-p{font-size:.76rem;padding:3px 8px;}
+.cal-multi .wo-badge{padding:1px 2px;gap:2px;}
+.cal-multi .wo-badge .wb-icon{font-size:.6rem;}
+.cal-multi .wo-badge .wb-p{font-size:.52rem;padding:0 3px;}
+
+.wo-panel{padding:16px 18px;display:flex;flex-direction:column;gap:10px;}
+.wo-step-row{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:12px;
+border:2px solid var(--border);background:var(--surface);}
+.wo-step-row.has{border-color:var(--family);background:var(--family-lt);}
+.wo-step-row .ws-name{font-weight:800;font-size:.92rem;}
+.wo-step-row.dad .ws-name{color:var(--dad-text);}
+.wo-step-row.mom .ws-name{color:var(--mom-text);}
+.wo-stepper{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.wo-stepper button{width:32px;height:32px;border-radius:50%;border:2px solid var(--border);background:var(--bg);
+color:var(--text);font-size:1.05rem;font-weight:900;cursor:pointer;font-family:'Nunito',sans-serif;line-height:1;}
+.wo-stepper button:hover:not(:disabled){border-color:var(--family);}
+.wo-stepper button:disabled{opacity:.35;cursor:default;}
+.wo-stepper .ws-n{min-width:22px;text-align:center;font-weight:900;font-size:1.05rem;}
+
+.wo-countdown{text-align:center;padding:6px 0 2px;}
+.wo-countdown .wc-big{font-family:'Fredoka One',cursive;font-size:2.4rem;line-height:1;color:var(--family);}
+.wo-countdown .wc-sub{font-size:.82rem;font-weight:700;color:var(--muted);margin-top:4px;}
+.wo-card{border:2px solid var(--border);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:9px;}
+.wo-card-head{display:flex;align-items:baseline;gap:8px;}
+.wo-card-head .wch-name{font-family:'Fredoka One',cursive;font-size:1.15rem;}
+.wo-card.dad .wch-name{color:var(--dad-text);}
+.wo-card.mom .wch-name{color:var(--mom-text);}
+.wo-card-head .wch-count{margin-left:auto;font-weight:900;font-size:1rem;}
+.wo-dots{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;}
+.wo-dot{aspect-ratio:1;border-radius:50%;border:2px solid var(--border);background:var(--bg);}
+.wo-card.dad .wo-dot.on{background:var(--dad);border-color:var(--dad);}
+.wo-card.mom .wo-dot.on{background:var(--mom);border-color:var(--mom);}
+.wo-stats{font-size:.78rem;font-weight:700;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px;}
+.wo-stats .behind{color:#dc2626;}
+.wo-stats .ahead{color:var(--family-text);}
+.wo-done{font-weight:900;color:var(--family-text);font-size:.9rem;}
+.wo-today{display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:800;}
+
 @media(max-width:700px){
 .cal-cell{min-height:70px;}
 .event-chip{font-size:.58rem;padding:2px 4px;}
@@ -559,6 +630,7 @@ border-radius:10px;padding:10px 13px;line-height:1.45;}
   <button class="hidden-btn" id="hiddenBtn" style="display:none;" title="Synced events you deleted">🚫 Hidden <span id="hiddenCount">0</span></button>
   <button class="meal-lib-btn" id="mealLibBtn">🍽️ Meal Library</button>
   <button class="lunch-lib-btn" id="lunchWeekBtn">🥪 Lunches</button>
+  <button class="wo-lib-btn" id="workoutBtn" title="Spring Break 50 workout challenge">💪 Workouts</button>
   <button class="refresh-btn" id="refreshBtn" title="Refresh from cloud">🔄</button>
   <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">🌙</button>
   <div class="legend" title="Tap a person to filter">
@@ -604,6 +676,7 @@ border-radius:10px;padding:10px 13px;line-height:1.45;}
     <button class="panel-tab active" data-tab="events">📅 Events</button>
     <button class="panel-tab" data-tab="meal">🍽️ Dinner</button>
     <button class="panel-tab" data-tab="lunch">🥪 Lunch</button>
+    <button class="panel-tab" data-tab="workout">💪 Workout</button>
   </div>
 
   <!-- Events tab -->
@@ -679,6 +752,24 @@ border-radius:10px;padding:10px 13px;line-height:1.45;}
 
   <div class="panel-tab-content" id="tab-lunch">
     <div class="lunch-panel" id="lunchPanel"></div>
+  </div>
+
+  <!-- Workout tab -->
+
+  <div class="panel-tab-content" id="tab-workout">
+    <div class="wo-panel" id="workoutPanel"></div>
+  </div>
+</div>
+
+<!-- ── WORKOUT CHALLENGE MODAL ── -->
+
+<div class="modal-overlay" id="workoutModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">💪 Spring Break 50</div>
+      <button class="btn-close" id="closeWorkoutModal">✕</button>
+    </div>
+    <div class="modal-body" id="workoutModalBody"></div>
   </div>
 </div>
 
@@ -1290,6 +1381,139 @@ async function toggleLunch(key, kid) {
   const i = kids.indexOf(kid);
   if (i >= 0) kids.splice(i, 1); else kids.push(kid);
   await setLunchKids(key, kids);
+}
+
+// ═══════════════════════════════════════════════
+// SUPABASE — WORKOUT CHALLENGE (Spring Break 50)
+// One row per person per day holding how many workouts they logged, so a second
+// workout on the same day counts as two. Needs a `workouts` table:
+//   create table workouts (
+//     id uuid primary key default gen_random_uuid(),
+//     calendar_id text not null, event_key text not null, person text not null,
+//     count int not null default 0, updated_at timestamptz default now(),
+//     unique (calendar_id, event_key, person)
+//   );
+//   alter table workouts enable row level security;
+//   create policy "anon all" on workouts for all using (true) with check (true);
+// Until it exists, workouts save to this device and upload once the table appears.
+// ═══════════════════════════════════════════════
+const CHALLENGE = {
+  start: new Date(2026, 10, 25), // Nov 25 2026 — first day that counts
+  end:   new Date(2027, 2, 2),   // Mar 2 2027 — last day that counts
+  trip:  new Date(2027, 2, 3),   // Spring Break departure
+  goal:  50
+};
+const WORKOUT_PEOPLE = [
+  { key:'dad', name:'Dad' },
+  { key:'mom', name:'Mom' }
+];
+const WORKOUT_MAX_PER_DAY = 5;
+const WORKOUT_PENDING_LS = 'fam-workouts-pending-v1';
+let workouts = {};          // "Y-M-D" → {dad:n, mom:n}
+let workoutTableOk = true;
+
+const DAY_MS = 86400000;
+// Whole days from the challenge start; Math.round absorbs DST shifts.
+function challengeDayIndex(d){
+  return Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - CHALLENGE.start) / DAY_MS);
+}
+const CHALLENGE_DAYS = challengeDayIndex(CHALLENGE.end) + 1;
+function inChallenge(y, m, d){
+  const i = challengeDayIndex(new Date(y, m, d));
+  return i >= 0 && i < CHALLENGE_DAYS;
+}
+function workoutCount(key, p){ return (workouts[key] && workouts[key][p]) || 0; }
+function workoutName(p){ const w = WORKOUT_PEOPLE.find(w => w.key === p); return w ? w.name : p; }
+
+function setLocalWorkout(key, p, n){
+  if (n > 0) { (workouts[key] = workouts[key] || {})[p] = n; }
+  else if (workouts[key]) {
+    delete workouts[key][p];
+    if (!Object.keys(workouts[key]).length) delete workouts[key];
+  }
+}
+function markWorkoutPending(key, p){
+  const s = new Set(lsGet(WORKOUT_PENDING_LS) || []);
+  s.add(`${key}|${p}`);
+  lsSet(WORKOUT_PENDING_LS, [...s]);
+}
+async function pushWorkout(key, p){
+  try {
+    const { error } = await db.from('workouts').upsert(
+      { calendar_id:CALENDAR_ID, event_key:key, person:p, count:workoutCount(key, p),
+        updated_at:new Date().toISOString() },
+      { onConflict:'calendar_id,event_key,person' });
+    if (error) throw error;
+  } catch(e) {
+    console.warn('Save workout failed:', e.message);
+    markWorkoutPending(key, p);
+  }
+}
+
+async function loadWorkouts(){
+  const cached = lsGet('fam-workouts-v1') || {};
+  const pending = lsGet(WORKOUT_PENDING_LS) || [];
+  try {
+    const { data, error } = await db.from('workouts')
+      .select('event_key,person,count').eq('calendar_id', CALENDAR_ID);
+    if (error) throw error;
+    workouts = {};
+    for (const r of data) if (r.count > 0) setLocalWorkout(r.event_key, r.person, r.count);
+    workoutTableOk = true;
+    // Changes made while the cloud was unreachable win over what the cloud holds.
+    for (const id of pending) {
+      const [k, p] = id.split('|');
+      setLocalWorkout(k, p, (cached[k] && cached[k][p]) || 0);
+    }
+    lsSet('fam-workouts-v1', workouts);
+    if (pending.length) {
+      lsSet(WORKOUT_PENDING_LS, []);
+      await Promise.all(pending.map(id => { const [k, p] = id.split('|'); return pushWorkout(k, p); }));
+    }
+  } catch(e) {
+    console.warn('Workouts load failed — using this device only:', e.message);
+    workouts = cached;
+    workoutTableOk = false;
+  }
+}
+
+async function setWorkoutCount(key, p, n){
+  setLocalWorkout(key, p, Math.max(0, Math.min(WORKOUT_MAX_PER_DAY, n)));
+  lsSet('fam-workouts-v1', workouts);
+  if (!workoutTableOk) { markWorkoutPending(key, p); return; }
+  await pushWorkout(key, p);
+}
+
+function challengeStats(p){
+  let total = 0;
+  for (const [k, v] of Object.entries(workouts)) {
+    if (!v[p]) continue;
+    const [y, m, d] = k.split('-').map(Number);
+    if (inChallenge(y, m, d)) total += v[p];
+  }
+  const idx = challengeDayIndex(today);
+  const elapsed  = Math.min(Math.max(idx + 1, 0), CHALLENGE_DAYS);   // days so far, incl. today
+  const daysLeft = Math.min(Math.max(CHALLENGE_DAYS - idx, 0), CHALLENGE_DAYS); // incl. today
+  const remaining = Math.max(CHALLENGE.goal - total, 0);
+  // Even-pace target by the end of today; floor keeps day one at zero.
+  const paceDiff = total - Math.floor(CHALLENGE.goal * elapsed / CHALLENGE_DAYS);
+  const perWeek = daysLeft ? remaining / daysLeft * 7 : 0;
+  // Streak: consecutive days with a workout, ending today (or yesterday if today is still open).
+  let streak = 0;
+  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (!workoutCount(dayKeyOf(d), p)) d.setDate(d.getDate() - 1);
+  while (workoutCount(dayKeyOf(d), p) && challengeDayIndex(d) >= 0) { streak++; d.setDate(d.getDate() - 1); }
+  const todayN = workoutCount(dayKeyOf(today), p);
+  return { total, remaining, daysLeft, paceDiff, perWeek, streak, todayN, done: total >= CHALLENGE.goal };
+}
+function paceLabel(s){
+  if (s.done) return { text:'🎉 Done!', cls:'' };
+  if (s.paceDiff > 0) return { text:`${s.paceDiff} ahead`, cls:'ahead' };
+  if (s.paceDiff < 0) return { text:`${-s.paceDiff} behind`, cls:'behind' };
+  return { text:'on pace', cls:'' };
+}
+function daysToTrip(){
+  return Math.round((CHALLENGE.trip - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / DAY_MS);
 }
 
 // Weekends and district closures need no lunch at all, so the UI stays out of the way.
@@ -1999,6 +2223,7 @@ function renderReminders(){
   const area=document.getElementById('reminderArea');
   const key=`${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
   area.innerHTML='';
+  renderWorkoutBanner(area);
   for(const[person,emoji,cls]of[['charlotte','🔔','charlotte-banner'],['alice','🧜‍♀️','alice-banner']]){
     if(!activePersonFilter.has(person))continue;
     const mine=(events[key]||[]).filter(e=>e.person===person&&e.fromICS).sort(byStartTime);
@@ -2179,6 +2404,18 @@ function buildDayCell(year,month,day,isCur,opts={}){
     badge.innerHTML='<span class="lb-icon">🥪</span>'+lunchKids.map(k=>
       `<span class="lb-kid ${k}">${detail?kidName(k):kidName(k)[0]}</span>`).join('');
     badge.addEventListener('click',e=>{e.stopPropagation();openPanel(year,month,day,'lunch');});
+    cell.appendChild(badge);
+  }
+  const woPeople=WORKOUT_PEOPLE.filter(w=>workoutCount(key,w.key)&&activePersonFilter.has(w.key));
+  if(woPeople.length){
+    const badge=document.createElement('div');
+    badge.className='wo-badge';
+    badge.title='Workouts: '+woPeople.map(w=>`${w.name} ×${workoutCount(key,w.key)}`).join(', ');
+    badge.innerHTML='<span class="wb-icon">💪</span>'+woPeople.map(w=>{
+      const n=workoutCount(key,w.key);
+      return`<span class="wb-p ${w.key}">${detail?w.name:w.name[0]}${n>1?'×'+n:''}</span>`;
+    }).join('');
+    badge.addEventListener('click',e=>{e.stopPropagation();openPanel(year,month,day,'workout');});
     cell.appendChild(badge);
   }
   cell.addEventListener('click',()=>openPanel(year,month,day,'events'));
@@ -2427,6 +2664,7 @@ function switchPanelTab(tab){
   }
   if(tab==='meal')renderMealPicker(y,m,d);
   if(tab==='lunch')renderLunchPanel(y,m,d);
+  if(tab==='workout')renderWorkoutPanel(y,m,d);
 }
 
 document.querySelectorAll('.panel-tab').forEach(btn=>{
@@ -2712,6 +2950,163 @@ async function setWholeLunchWeek(allHome){
 }
 
 document.getElementById('lunchWeekBtn').addEventListener('click',()=>openLunchWeek());
+
+// ═══════════════════════════════════════════════
+// WORKOUT CHALLENGE — banner, day panel, progress modal
+// ═══════════════════════════════════════════════
+function afterWorkoutChange(){
+  renderCalendar();
+  renderReminders();
+  const p=document.getElementById('sidePanel');
+  if(p.classList.contains('open')&&document.getElementById('tab-workout').classList.contains('active'))
+    renderWorkoutPanel(+p.dataset.y,+p.dataset.m,+p.dataset.d);
+  if(document.getElementById('workoutModal').classList.contains('open'))renderWorkoutModal();
+}
+
+// Always-on progress banner from two weeks before the start until a week into the trip.
+function renderWorkoutBanner(area){
+  const idx=challengeDayIndex(today);
+  const toTrip=daysToTrip();
+  if(idx<-14||toTrip<-7)return;
+  const live=inChallenge(today.getFullYear(),today.getMonth(),today.getDate());
+  const div=document.createElement('div');
+  div.className='reminder-banner wo-banner';
+  div.title='Open workout progress';
+  const head=toTrip>0
+    ?`<strong>🏖️ Spring Break in ${toTrip} day${toTrip===1?'':'s'}</strong> · ${CHALLENGE.goal} workouts each by Mar 2`
+    :`<strong>🏖️ Spring Break!</strong> · final tally`;
+  const rows=WORKOUT_PEOPLE.map(w=>{
+    const s=challengeStats(w.key);
+    const pace=paceLabel(s);
+    const pct=Math.min(100,s.total/CHALLENGE.goal*100);
+    const plus=live
+      ?`<button class="wo-plus${s.todayN?' done':''}" data-p="${w.key}" title="Log a workout for ${w.name} today">${s.todayN?'✓'+(s.todayN>1?'×'+s.todayN:'')+' +1':'+1 today'}</button>`
+      :'';
+    return`<div class="wo-row">
+      <span class="wo-name">${w.name}</span>
+      <div class="wo-bar"><div style="width:${pct}%"></div></div>
+      <span class="wo-count">${s.total}/${CHALLENGE.goal}</span>
+      ${live||s.done?`<span class="wo-pace ${pace.cls}">${pace.text}</span>`:''}
+      ${plus}
+    </div>`;
+  }).join('');
+  div.innerHTML=`<span class="bell">💪</span>
+    <div class="wo-main"><div class="wo-head">${head}</div><div class="wo-rows">${rows}</div></div>`;
+  div.addEventListener('click',()=>openWorkoutModal());
+  div.querySelectorAll('.wo-plus').forEach(b=>b.addEventListener('click',async e=>{
+    e.stopPropagation();
+    const key=dayKeyOf(today);
+    await setWorkoutCount(key,b.dataset.p,workoutCount(key,b.dataset.p)+1);
+    afterWorkoutChange();
+  }));
+  area.appendChild(div);
+}
+
+function workoutStepper(key,p,onChange){
+  const n=workoutCount(key,p);
+  const wrap=document.createElement('div');
+  wrap.className='wo-stepper';
+  wrap.innerHTML=`<button type="button" data-d="-1" title="Remove one" ${n?'':'disabled'}>−</button>
+    <span class="ws-n">${n}</span>
+    <button type="button" data-d="1" title="Add one" ${n>=WORKOUT_MAX_PER_DAY?'disabled':''}>+</button>`;
+  wrap.querySelectorAll('button').forEach(b=>b.addEventListener('click',async e=>{
+    e.stopPropagation();
+    await setWorkoutCount(key,p,workoutCount(key,p)+(+b.dataset.d));
+    onChange();
+  }));
+  return wrap;
+}
+
+function renderWorkoutPanel(y,m,d){
+  const wrap=document.getElementById('workoutPanel');
+  const key=`${y}-${m}-${d}`;
+  wrap.innerHTML='';
+  const note=document.createElement('div');
+  note.className='lunch-note';
+  note.innerHTML=inChallenge(y,m,d)
+    ?`Log each workout — a second one on the same day counts too. Goal: <strong>${CHALLENGE.goal} each by Mar 2</strong>.`
+    :"⚠️ This day is outside the Spring Break 50 window (Nov 25 – Mar 2), so it won't count toward the goal.";
+  wrap.appendChild(note);
+  for(const w of WORKOUT_PEOPLE){
+    const row=document.createElement('div');
+    row.className=`wo-step-row ${w.key}`+(workoutCount(key,w.key)?' has':'');
+    row.innerHTML=`<span class="ws-name">💪 ${w.name}</span>`;
+    row.appendChild(workoutStepper(key,w.key,afterWorkoutChange));
+    wrap.appendChild(row);
+  }
+  const link=document.createElement('button');
+  link.className='lunch-week-link';
+  link.textContent='📊 See challenge progress →';
+  link.addEventListener('click',()=>openWorkoutModal());
+  wrap.appendChild(link);
+  if(!workoutTableOk){
+    const warn=document.createElement('div');
+    warn.className='lunch-note';
+    warn.innerHTML="⚠️ Saving to this device only — the <strong>workouts</strong> table "+
+      "isn't set up in Supabase yet. Entries will upload once it is.";
+    wrap.appendChild(warn);
+  }
+}
+
+function openWorkoutModal(){
+  document.getElementById('workoutModal').classList.add('open');
+  renderWorkoutModal();
+}
+
+function renderWorkoutModal(){
+  const body=document.getElementById('workoutModalBody');
+  const toTrip=daysToTrip();
+  const live=inChallenge(today.getFullYear(),today.getMonth(),today.getDate());
+  const daysLeft=challengeStats('dad').daysLeft;
+  body.innerHTML=`<div class="wo-countdown">
+    <div class="wc-big">${toTrip>0?toTrip:'🏖️'}</div>
+    <div class="wc-sub">${toTrip>0
+      ?`day${toTrip===1?'':'s'} until Spring Break (Wed, Mar 3) · ${daysLeft} workout day${daysLeft===1?'':'s'} left, through Tue, Mar 2`
+      :'Spring Break is here — final tally below'}</div>
+  </div>`;
+  for(const w of WORKOUT_PEOPLE){
+    const s=challengeStats(w.key);
+    const pace=paceLabel(s);
+    const card=document.createElement('div');
+    card.className=`wo-card ${w.key}`;
+    const dots=Array.from({length:CHALLENGE.goal},(_,i)=>
+      `<div class="wo-dot${i<s.total?' on':''}"></div>`).join('');
+    const bonus=s.total>CHALLENGE.goal?` <span class="wo-done">+${s.total-CHALLENGE.goal} bonus 🔥</span>`:'';
+    const stats=s.done
+      ?`<span class="wo-done">🎉 ${CHALLENGE.goal} done — goal hit!</span>`
+      :`<span>${s.remaining} to go</span>`+
+       (s.daysLeft>=7?`<span>${s.perWeek.toFixed(1)}/week needed</span>`
+        :s.daysLeft?`<span>${s.remaining} in ${s.daysLeft} day${s.daysLeft===1?'':'s'}</span>`:'')+
+       (live?`<span class="${pace.cls}">${pace.text}</span>`:'');
+    card.innerHTML=`<div class="wo-card-head">
+        <span class="wch-name">${w.name}</span>
+        <span class="wch-count">${s.total} / ${CHALLENGE.goal}${bonus}</span>
+      </div>
+      <div class="wo-dots">${dots}</div>
+      <div class="wo-stats">${stats}${s.streak>1?`<span>🔥 ${s.streak}-day streak</span>`:''}</div>`;
+    if(live){
+      const t=document.createElement('div');
+      t.className='wo-today';
+      t.innerHTML='<span>Today:</span>';
+      t.appendChild(workoutStepper(dayKeyOf(today),w.key,afterWorkoutChange));
+      card.appendChild(t);
+    }
+    body.appendChild(card);
+  }
+  const tip=document.createElement('div');
+  tip.className='lunch-note';
+  tip.textContent='Missed logging a day? Tap that day on the calendar → 💪 Workout tab.';
+  body.appendChild(tip);
+}
+
+document.getElementById('workoutBtn').addEventListener('click',()=>openWorkoutModal());
+document.getElementById('closeWorkoutModal').addEventListener('click',()=>{
+  document.getElementById('workoutModal').classList.remove('open');
+});
+document.getElementById('workoutModal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('workoutModal'))
+    document.getElementById('workoutModal').classList.remove('open');
+});
 document.getElementById('closeLunchModal').addEventListener('click',()=>{
   document.getElementById('lunchModal').classList.remove('open');
 });
@@ -3447,7 +3842,7 @@ async function refreshAll(){
   btn.classList.add('spinning');
   try {
     await loadHiddenICS(); // before events, so hidden ones never flash back in
-    await Promise.all([loadEvents(), loadMeals(), loadMealLib(), loadSideLib(), loadLunches()]);
+    await Promise.all([loadEvents(), loadMeals(), loadMealLib(), loadSideLib(), loadLunches(), loadWorkouts()]);
     updateHiddenBtn();
     renderCalendar();
     renderReminders();
@@ -3518,7 +3913,7 @@ document.querySelectorAll('.view-mode-btn').forEach(btn=>{
 // ═══════════════════════════════════════════════
 async function init(){
   await loadHiddenICS(); // before events, so hidden ones never flash back in
-  await Promise.all([loadEvents(), loadMeals(), loadMealLib(), loadSideLib(), loadLunches()]);
+  await Promise.all([loadEvents(), loadMeals(), loadMealLib(), loadSideLib(), loadLunches(), loadWorkouts()]);
   updateHiddenBtn();
   backfillIconsFromName();
   await cleanupSeedData();
